@@ -1291,7 +1291,8 @@ class Solution(collections.abc.Mapping):
           totalElementsM = totalVectors * grvw
           grvw = i * pv
           totalVectors = totalElementsM // grvw
-          return Solution.setGlobalLoadVectorWidth(state, tc, totalVectors, grvw)
+          if totalVectors != 0:
+            return Solution.setGlobalLoadVectorWidth(state, tc, totalVectors, grvw)
       validDepthU = False
 
     # NumLoads is NOT used on the fractional path
@@ -2479,7 +2480,7 @@ class Solution(collections.abc.Mapping):
 
       if state["ProblemType"]["SparseA"] and not state["DirectToVgprSparseMetadata"]:
         if state["GlobalReadVectorWidth"] % 4 != 0:
-          reject(state, "Sparse requires GRVW % 4 == 0, current GRVW is %u"%state["GlobalReadVectorWidth"])
+          reject(state, "Sparse requires GRVW %% 4 = 0, current GRVW is %u"%state["GlobalReadVectorWidth"])
           return
         GlobalReadVectorWidth = state["GlobalReadVectorWidth"] // 4
         tvm = totalElementsM // GlobalReadVectorWidth
