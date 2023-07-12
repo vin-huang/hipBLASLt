@@ -1391,6 +1391,10 @@ class Solution(collections.abc.Mapping):
     if state["WaveSeparateGlobalRead%s"%tc]:
       state["LSP%s"%tc] = roundupRatio(state["LSP%s"%tc], state["NumThreads"] // state["WavefrontSize"])
 
+    #TODO FIXME
+    if tc == "Metadata" and state["ProblemType"]["TLUA"] and state["NumLoadsPerpendicular%s"%tc] != 1:
+      reject(state, "When TLUA=1 and DTVMS=0, NumLoadsPerpendicularMetadata have to be 1")
+      return False
     return True
 
 
