@@ -1538,6 +1538,7 @@ class KernelWriterAssembly(KernelWriter):
     tc = tP["tensorChar"]
     tP["vgprPackedOffsets"] = None
     tP["vgprTileOffsetsCheckOut"] = False
+    tP["vgprMetadataMargin"] = None
     tP["numVgprTileOffsets"] = 0
     if kernel["_UseSgprForGRO"]:
       # Let the vgprTileOffsets checkin handle tReg later since these are same vgpr
@@ -1554,10 +1555,19 @@ class KernelWriterAssembly(KernelWriter):
       stride = kernel[strideIdx]
 
       if tP["isM"] and not margin == -1:
-        # margin is the number of how many continuous element need to be read
-        # shift metadata global read offset to align A's global read offset.
-        module.add(VLShiftRightB32(dst=vgpr(v), shiftHex=hex(log2(margin)), src=vgpr(tP["gpr"]["tReg"]), comment="gro%s%s_%u /= %d"%(tP["tensorChar"], tP["tileChar"], 0, margin)))
-        module.add(VLShiftLeftB32(dst=vgpr(v), shiftHex=hex(log2(margin)), src=vgpr(v), comment="gro%s%s_%u *= %d"%(tP["tensorChar"], tP["tileChar"], 0, margin)))
+        marginM = tP["glvw"] if tP["rtv"] else 1
+        if marginM != margin:
+          # margin is the number of how many continuous element need to be read
+          # shift metadata global read offset to align A's global read offset.
+          tP["vgprMetadataMargin"] = self.vgprPool.checkOut(1, "vgprMetadataMargin")
+          module.add(VAndB32(dst=vgpr(v), src0=hex(margin-1), src1=self.sizeRef(tP["idx"]), comment="edge = Size%s %% %u"%(tP["tileChar"], margin)))
+          module.add(VCmpLtI32(dst=VCC(), src0=vgpr(v), src1=hex(marginM), comment = "if edge < %u" % marginM))
+          module.add(VLShiftRightB32(dst=vgpr(v), shiftHex=hex(log2(margin)), src=vgpr(tP["gpr"]["tReg"]), comment="gro%s%s_%u /= %d"%(tP["tensorChar"], tP["tileChar"], 0, margin)))
+          module.add(VLShiftLeftB32(dst=vgpr(v), shiftHex=hex(log2(margin)), src=vgpr(v), comment="gro%s%s_%u *= %d"%(tP["tensorChar"], tP["tileChar"], 0, margin)))
+          module.add(VCndMaskB32(dst=vgpr(v), src0=vgpr(v), src1=vgpr(tP["gpr"]["tReg"]), comment="gro%s%s_%u"%(tP["tensorChar"], tP["tileChar"], 0)))
+          module.add(VCndMaskB32(dst=vgpr(tP["vgprMetadataMargin"]), src0=hex(margin), src1=hex(marginM), comment="margin"))
+        else:
+          module.add(VMovB32(dst=vgpr(v), src=vgpr(tP["gpr"]["tReg"]), comment="gro%s%s_%u"%(tP["tensorChar"], tP["tileChar"], 0) ))
       else:
         module.add(VMovB32(dst=vgpr(v), src=vgpr(tP["gpr"]["tReg"]), comment="gro%s%s_%u"%(tP["tensorChar"], tP["tileChar"], 0) ))
 
@@ -1672,6 +1682,13 @@ class KernelWriterAssembly(KernelWriter):
     # otherwise, loaded data of A and Metadata will not match
     if margin == -1:
       margin = tP["glvw"] if tP["rtv"] else 1
+    
+    marginVgpr = None
+    if tP["isM"]:
+      marginM = tP["glvw"] if tP["rtv"] else 1
+      if marginM != margin:
+        marginVgpr = tP["vgprMetadataMargin"]
+
     edge = self.vgprPool.checkOut(1, "edge", self.states.preventVgprOverflowDuringNewTile)
 
     with self.allocTmpSgpr(1) as tmpSgprInfo:
@@ -1687,16 +1704,23 @@ class KernelWriterAssembly(KernelWriter):
         # edge = (Size - WG*MT) - margin = the last valid load position that won't cause OOB
         # offset = the current load position for this thread
         # so if offset is larger than edge, we go back to the edge position
-        module.add(SSubU32(dst=sgpr(tmpSgpr), src0=sgpr(tmpSgpr), src1=margin, comment="edge -= margin(%u)"%(margin)))
-        module.add(VMovB32(dst=vgpr(edge), src=sgpr(tmpSgpr), comment="edge vgpr = Size%s- WG*MT - margin(%u)"%(tP["tileChar"], margin) ))
+        if marginVgpr:
+          module.add(VSubU32(dst=vgpr(edge), src0=sgpr(tmpSgpr), src1=vgpr(marginVgpr), comment="edge -= margin"))
+        else:
+          module.add(SSubU32(dst=sgpr(tmpSgpr), src0=sgpr(tmpSgpr), src1=margin, comment="edge -= margin"))
+          module.add(VMovB32(dst=vgpr(edge), src=sgpr(tmpSgpr), comment="edge vgpr = Size%s- WG*MT - margin"%(tP["tileChar"]) ))
         #shiftedEdge = self.vgprPool.checkOut(1, "shiftedEdge", self.states.preventVgprOverflowDuringNewTile)
         #module.add(VAddCOU32(dst=vgpr(shiftedEdge), dst1=VCC(), src0=vgpr(edge), src1=self.states.srdShiftLeft[tc],
         #             comment="shiftedEdge = edge + srdShiftLeft({})".format(self.states.srdShiftLeft[tc])))
       else:
-        module.add(SSubU32(dst=sgpr(tmpSgpr), src0=self.sizeRef(tP["idx"]), src1=margin, \
-            comment="edge = Size%s-%u"%(tP["tileChar"], margin) ))
-        module.add(VMovB32(dst=vgpr(edge), src=sgpr(tmpSgpr), \
-            comment="edge vgpr = Size%s-%u"%(tP["tileChar"], margin) ))
+        if marginVgpr:
+            module.add(VSubU32(dst=sgpr(edge), src0=self.sizeRef(tP["idx"]), src1=vgpr(marginVgpr), \
+              comment="edge = Size%s-margin"%(tP["tileChar"]) ))
+        else:
+          module.add(SSubU32(dst=sgpr(tmpSgpr), src0=self.sizeRef(tP["idx"]), src1=margin, \
+              comment="edge = Size%s-%u"%(tP["tileChar"], margin) ))
+          module.add(VMovB32(dst=vgpr(edge), src=sgpr(tmpSgpr), \
+              comment="edge vgpr = Size%s-%u"%(tP["tileChar"], margin) ))
 
     # shift offsets
     vSrc = tP["vgprTileOffsets"]
@@ -1716,10 +1740,12 @@ class KernelWriterAssembly(KernelWriter):
           module.add(VCndMaskB32(dst=vgpr(vDst+l), src0=vgpr(edge), src1=vgpr(vSrc+l), src2=sgpr(tmpSgpr,self.states.laneSGPRCount),
                       comment="offset = (%s) ? offset(v%u) : edge(v%u)"%(cmpCommentText, vSrc+l, edge)))
     # For metadata and using A's margin, shift extra tail offset
-    if tP["isM"] and not marginO == -1:
-      module.add(VAndB32(dst=vgpr(edge), src0=(margin-1), src1=vgpr(tP["gpr"]["tReg"]), comment="shifTailOffstet = tailOffset %% %d"%(margin)))
-      module.add(VAddU32(dst=vgpr(vDst+l), src0=vgpr(edge), src1=vgpr(vSrc+l),
-                      comment="offset += shifTailOffstet"))
+    if tP["isM"] and marginVgpr != None:
+      module.add(VSubI32(dst=vgpr(edge), src0=vgpr(marginVgpr), src1=hex(1), comment="margin - 1"))
+      module.add(VAndB32(dst=vgpr(edge), src0=vgpr(edge), src1=vgpr(tP["gpr"]["tReg"]), comment="shifTailOffstet = tailOffset %% margin"))
+      for l in range(0, tP["nrt"]):
+        module.add(VAddU32(dst=vgpr(vDst+l), src0=vgpr(edge), src1=vgpr(vSrc+l),
+                        comment="offset += shifTailOffstet"))
     self.vgprPool.checkIn(edge)
     return module
 
@@ -1817,6 +1843,10 @@ class KernelWriterAssembly(KernelWriter):
       # _UseSgprForGRO uses same vgpr for ureg and tP["gpr"]["unrollOffsets"] so
       # let checkin(ureg) do the checkin
       # vgprTileOffsets is renamed version of treg/lwo so checkin here
+
+    if tP["vgprMetadataMargin"] != None:
+      self.vgprPool.checkIn(tP["vgprMetadataMargin"])
+      tP["vgprMetadataMargin"] = None
 
     if not kernel["_UseSgprForGRO"]:
       self.vgprPool.checkIn(tP["gpr"]["unrollOffsets"])
