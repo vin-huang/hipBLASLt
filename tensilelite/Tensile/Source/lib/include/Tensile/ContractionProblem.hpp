@@ -537,6 +537,7 @@ namespace Tensile
 
         void setBias(DataType                       type,
                      size_t                         length,
+                     size_t                         stride,
                      bool                           isOutput = false,
                      ContractionProblemGemm::TENSOR src      = ContractionProblemGemm::TENSOR::D)
         {
@@ -544,8 +545,32 @@ namespace Tensile
             m_biasSrc  = src;
             if(type != DataType::None && m_useBias)
             {
+                size_t batchIdx = 2;
+                for(size_t j = 0; j < m_batchIndices.size(); j++)
+                {
+                    switch(m_biasSrc)
+                    {
+                    case 0:
+                        batchIdx = m_batchIndices[j].a;
+                        break;
+                    case 1:
+                        batchIdx = m_batchIndices[j].b;
+                        break;
+                    case 2:
+                        batchIdx = m_batchIndices[j].c;
+                        break;
+                    case 3:
+                        batchIdx = m_batchIndices[j].d;
+                        break;
+                    default:
+                        break;
+                    }
+                }
                 m_tensors[ContractionProblemGemm::TENSOR::BIAS]
-                    = {"bias", m_biasType, {length}, {1, length}};
+                    = {"bias",
+                       m_biasType,
+                       {length, 1, m_tensors[m_biasSrc].sizes()[batchIdx]},
+                       {1, length, stride}};
                 m_tensors[ContractionProblemGemm::TENSOR::BIAS].setAsOutput(isOutput);
             }
         }
@@ -759,7 +784,10 @@ namespace Tensile
         {
             return m_tensors[ContractionProblemGemm::TENSOR::METADATA];
         }
-
+        TensorDescriptor const& bias() const
+        {
+            return m_tensors[ContractionProblemGemm::TENSOR::BIAS];
+        }
         FreeIndices const& freeIndicesA() const
         {
             return m_freeIndicesA;
@@ -988,6 +1016,7 @@ namespace Tensile
                           void const* const*   _batchC,
                           void* const*         _batchD,
                           void const*          _bias,
+                          void const* const*   _batchBias,
                           void const*          _scaleDVec,
                           void*                _ws,
                           unsigned char const* _metadata);
@@ -999,10 +1028,11 @@ namespace Tensile
         void*       d = nullptr;
         void*       e = nullptr;
 
-        void const* const* batchA = nullptr;
-        void const* const* batchB = nullptr;
-        void const* const* batchC = nullptr;
-        void* const*       batchD = nullptr;
+        void const* const* batchA    = nullptr;
+        void const* const* batchB    = nullptr;
+        void const* const* batchC    = nullptr;
+        void* const*       batchD    = nullptr;
+        void const* const* batchBias = nullptr;
 
         void const* bias      = nullptr;
         void const* scaleDVec = nullptr;

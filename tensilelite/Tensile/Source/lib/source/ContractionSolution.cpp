@@ -366,6 +366,7 @@ namespace Tensile
         TensorDescriptor const& c        = problem.c();
         TensorDescriptor const& d        = problem.d();
         TensorDescriptor const& e        = problem.tensor(ContractionProblemGemm::TENSOR::E);
+        TensorDescriptor const& bias     = problem.tensor(ContractionProblemGemm::TENSOR::BIAS);
         TensorDescriptor const& ca       = problem.compressed();
         TensorDescriptor const& metadata = problem.metadata();
 
@@ -482,7 +483,16 @@ namespace Tensile
                 args.template append<void const*>("ws_bias",
                                                   (uint8_t*)inputs.ws + workspaceOffsetInByte);
             else
-                args.template append<void const*>("bias", inputs.bias);
+            {
+                if(problemType.stridedBatched)
+                {
+                    args.template append<void const*>("bias", inputs.bias);
+                }
+                else
+                {
+                    args.template append<void const* const*>("batchBias", inputs.batchBias);
+                }
+            }
         }
 
         if(problemType.useBias && (sizeMapping.globalSplitU == 1)
@@ -492,7 +502,8 @@ namespace Tensile
                        || problem.biasSrc() == ContractionProblemGemm::TENSOR::B))))
         {
             args.template append<uint32_t>("bias_type", static_cast<uint32_t>(problem.biasType()));
-            args.template append<uint32_t>("strideBias", static_cast<uint32_t>(0)); // reserved
+            args.template append<uint32_t>("strideBias",
+                                           bias.strides()[bias.dimensions() - 1]); // reserved
         }
 
         if(problemType.useE)
@@ -596,7 +607,7 @@ namespace Tensile
         return rv;
     }
 
-template <typename KA>
+    template <typename KA>
     void
         ContractionSolution::calculateSingleCallWorkGroupItems(std::vector<Problem> const& problems,
                                                                const Tensile::dim3& workGroupSize,
@@ -646,8 +657,8 @@ template <typename KA>
 
                 numWorkGroups.y *= sizeMapping.globalSplitU;
 
-                numWorkItems.x += (workGroupSize.x * numWorkGroups.x * workGroupSize.y * numWorkGroups.y
-                                * workGroupSize.z * numWorkGroups.z);
+                numWorkItems.x += (workGroupSize.x * numWorkGroups.x * workGroupSize.y
+                                   * numWorkGroups.y * workGroupSize.z * numWorkGroups.z);
 
                 if constexpr(std::is_same<KA, KernelArguments>::value)
                 {
@@ -799,6 +810,12 @@ template <typename KA>
         for(size_t i = 1; i < c.dimensions(); i++)
             rv.args.append<uint32_t>(concatenate_if<T_Debug>("strideC", i),
                                      c.sizes()[i] == 1 ? 0 : c.strides()[i]);
+
+        if(problemType.useBias)
+        {
+            TensorDescriptor const& bias = problem.tensor(ContractionProblemGemm::TENSOR::BIAS);
+            rv.args.append<uint32_t>("strideBias", bias.strides()[bias.dimensions() - 1]);
+        }
 
         int idx = 0;
         for(auto size : problem.d().sizes())
@@ -985,6 +1002,12 @@ template <typename KA>
 
         for(size_t i = 1; i < c.dimensions(); i++)
             args.template append<uint32_t>(concatenate_if<T_Debug>("strideC", i), c.strides()[i]);
+
+        if(problemType.useBias)
+        {
+            TensorDescriptor const& bias = problem.tensor(ContractionProblemGemm::TENSOR::BIAS);
+            args.template append<uint32_t>("strideBias", bias.strides()[bias.dimensions() - 1]);
+        }
 
         int i = 0;
         for(auto size : problem.d().sizes())

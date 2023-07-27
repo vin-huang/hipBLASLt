@@ -127,6 +127,9 @@ class KernelWriterConversion(KernelWriterBase):
     for i in range(firstStrideCD, lastStrideC):
       kStr += "  unsigned int strideC%s;%s" % (self.indexChars[i], self.endLine)
 
+    if self.state["ProblemType"]["UseBias"]:
+      kStr += "  unsigned int strideBias;%s" % (self.endLine)
+
     # sizes
     for i in range(0, self.state["ProblemType"]["NumIndicesC"]):
       if i < (self.state["ProblemType"]["NumIndicesC"] - 1):
@@ -229,6 +232,16 @@ class KernelWriterConversion(KernelWriterBase):
       indexChar = self.indexChars[i]
       kStr += " + (IDX%s)*arg.strideC%s" % (indexChar, indexChar)
     kStr += " ))" + self.endLine
+
+    # GLOBAL_BIAS()
+    if self.state["ProblemType"]["UseBias"] and self.state["ProblemType"]["NumIndicesC"] > 2:
+      kStr += "#define GLOBAL_BIAS(IDX%s" % self.indexChars[0]
+      kStr += ", IDX%s" % self.indexChars[2]
+      indexChar = self.indexChars[0]
+      kStr += ") (( (IDX%s)" % (indexChar)
+      indexChar = self.indexChars[2]
+      kStr += " + (IDX%s)*arg.strideBias" % (indexChar)
+      kStr += " ))" + self.endLine
 
     self.num_dword_load = int(self.num_elements_load * self.state["ProblemType"]["ComputeDataType"].numBytes() / 4)
     self.num_dword_store = int(self.num_elements_load * self.state["ProblemType"]["DestDataType"].numBytes() / 4)
@@ -345,6 +358,13 @@ class KernelWriterConversion(KernelWriterBase):
       kStr += '0'  if i in nonTileFreeIndices else ('id%d' % i)
     kStr += ");%s" % (self.endLine)
 
+    if self.state["ProblemType"]["UseBias"]:
+      if problemType["NumIndicesC"] > 2:
+        kStr += "  %s idxBias = GLOBAL_BIAS((%s)id0, id2);%s" % (self.uint64Str, self.uint64Str, self.endLine)
+      else:
+        kStr += "  %s idxBias = id0;%s" % (self.uint64Str, self.uint64Str, self.endLine)
+
+
     ########################################
     # multi buffers GSU: Accumulate all GSU buffer
     intermediateDataType = self.datatype
@@ -436,7 +456,7 @@ class KernelWriterConversion(KernelWriterBase):
     if self.state["ProblemType"]["UseBias"] and (not self.state["ProblemType"]["Gradient"]):
       kStr += "  if(arg.Bias != 0){" + self.endLine
       for vIdx in range(self.num_dword_load):
-        kStr += "    %s[%d] += (%s)arg.Bias[id0+%d];%s" % (accumStr, vIdx, intermediateDataType, vIdx, self.endLine)
+        kStr += "    %s[%d] += (%s)arg.Bias[idxBias+%d];%s" % (accumStr, vIdx, intermediateDataType, vIdx, self.endLine)
       kStr += "  }" + self.endLine
       kStr += self.endLine
 
@@ -520,6 +540,8 @@ class KernelWriterConversion(KernelWriterBase):
     kStr += "#undef GLOBAL_D%s" % (self.endLine)
     kStr += "#undef GLOBAL_W%s" % (self.endLine)
     kStr += "#undef GLOBAL_C%s" % (self.endLine)
+    if self.state["ProblemType"]["UseBias"]:
+      kStr += "#undef GLOBAL_BIAS%s" % (self.endLine)
     if self.state["ProblemType"]["UseE"]:
       kStr += "#undef GLOBAL_E%s" % (self.endLine)
 

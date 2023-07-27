@@ -175,6 +175,7 @@ class ProblemType:
         rv.useBias               = False
         rv.biasDataTypeWhiteList = []
         rv.biasSrcWhiteList = []
+        rv.setConstStrideBias = []
         if 'UseBias' in d:
             rv.useBias = d['UseBias']
             if 'BiasDataTypeList' in d:
@@ -185,6 +186,8 @@ class ProblemType:
             if 'BiasSrc' in d:
                 m = ["A", "B", "C", "D"]
                 rv.biasSrcWhiteList = [m.index(d['BiasSrc'])]
+            if 'SetConstStrideBias' in d:
+                rv.setConstStrideBias = d['SetConstStrideBias']
 
         rv.useE = False
         if 'UseE' in d:

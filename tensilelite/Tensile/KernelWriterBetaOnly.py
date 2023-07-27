@@ -93,6 +93,9 @@ class KernelWriterBetaOnly(KernelWriterBase):
     for i in range(firstStrideCD, lastStrideC):
       kStr += "  unsigned int const strideC%s,%s" % (self.indexChars[i], self.endLine)
 
+    if self.state["ProblemType"]["BetaOnlyUseBias"]:
+      kStr += "  unsigned int strideBias,%s" % (self.endLine)
+
     # sizes
     for i in range(0, self.state["ProblemType"]["NumIndicesC"]):
       kStr += "  unsigned int const size%s,%s" % (self.indexChars[i], self.endLine)

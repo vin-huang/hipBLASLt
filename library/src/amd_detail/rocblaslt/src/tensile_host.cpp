@@ -445,7 +445,7 @@ namespace
             = (biasSrc == Tensile::ContractionProblemGemm::TENSOR::B) ? d.sizes()[1] : d.sizes()[0];
         tensileProblem.setUseBias(true);
         tensileProblem.setBias(
-            hipblasDatatype_to_tensile_type(prob.bias_type), biasSize, prob.gradient, biasSrc);
+            hipblasDatatype_to_tensile_type(prob.bias_type), biasSize, 0, prob.gradient, biasSrc);
 
         // set ScaleDVec mode
         tensileProblem.setUseScaleDVec(true);
@@ -608,8 +608,11 @@ namespace
             auto biasSize = (biasSrc == Tensile::ContractionProblemGemm::TENSOR::B) ? d.sizes()[1]
                                                                                     : d.sizes()[0];
             tensileProblem.setUseBias(true);
-            tensileProblem.setBias(
-                hipblasDatatype_to_tensile_type(prob.bias_type), biasSize, prob.gradient, biasSrc);
+            tensileProblem.setBias(hipblasDatatype_to_tensile_type(prob.bias_type),
+                                   biasSize,
+                                   0,
+                                   prob.gradient,
+                                   biasSrc);
 
             // set ScaleDVec mode
             tensileProblem.setUseScaleDVec(true);
@@ -1241,9 +1244,11 @@ rocblaslt_status groupedGemmCreate(std::vector<RocblasltContractionProblem<Ti, T
             for(int i = 0; i < probs.size(); i++)
             {
                 // Check if pointer is valid for n != 0
-                if (probs[i].n) {
-                    if(probs[i].alpha == nullptr || probs[i].beta == nullptr || probs[i].A == nullptr
-                    || probs[i].B == nullptr || probs[i].C == nullptr || probs[i].D == nullptr)
+                if(probs[i].n)
+                {
+                    if(probs[i].alpha == nullptr || probs[i].beta == nullptr
+                       || probs[i].A == nullptr || probs[i].B == nullptr || probs[i].C == nullptr
+                       || probs[i].D == nullptr)
                     {
                         log_error(__func__, "invalid data pointer");
                         return rocblaslt_status_invalid_pointer;
@@ -1265,9 +1270,11 @@ rocblaslt_status groupedGemmCreate(std::vector<RocblasltContractionProblem<Ti, T
             for(int i = 0; i < probs.size(); i++)
             {
                 // Check if pointer is valid for n != 0
-                if (probs[i].n) {
-                    if(probs[i].alpha == nullptr || probs[i].beta == nullptr || probs[i].A == nullptr
-                    || probs[i].B == nullptr || probs[i].C == nullptr || probs[i].D == nullptr)
+                if(probs[i].n)
+                {
+                    if(probs[i].alpha == nullptr || probs[i].beta == nullptr
+                       || probs[i].A == nullptr || probs[i].B == nullptr || probs[i].C == nullptr
+                       || probs[i].D == nullptr)
                     {
                         log_error(__func__, "invalid data pointer");
                         return rocblaslt_status_invalid_pointer;
