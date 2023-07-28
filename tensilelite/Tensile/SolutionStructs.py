@@ -2836,6 +2836,9 @@ class Solution(collections.abc.Mapping):
       else:
         state["StoreRemapVectorWidth"] = defaultRemap
 
+    if state["StoreRemapVectorWidth"] != 0 and problemType["UseBias"] and state["GlobalSplitU"] == 1:
+      reject(state, "Bias only support StoreRemapVectorWidth=0 when GSU=1;")
+
     # GuaranteeNoPartial
     if state["ProblemType"]["TLUA"]:
       state["GuaranteeNoPartialA"] = state["AssertFree0ElementMultiple"]%state["GlobalReadVectorWidthA"]==0
