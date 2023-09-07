@@ -219,7 +219,7 @@ namespace Tensile
         TensorDescriptor bias("bias");
         TensorDescriptor scaleA("scaleA");
         TensorDescriptor scaleB("scaleB");
-        TensorDescriptor scaleC("scaleC");
+TensorDescriptor scaleC("scaleC");
         TensorDescriptor scaleD("scaleD");
         TensorDescriptor scaleDVec("scaleDVec");
         TensorDescriptor scaleAlphaVec("scaleAlphaVec");
@@ -232,7 +232,7 @@ namespace Tensile
                                       bias,
                                       scaleA,
                                       scaleB,
-                                      scaleC,
+scaleC,
                                       scaleD,
                                       scaleDVec,
                                       scaleAlphaVec,
@@ -532,7 +532,7 @@ namespace Tensile
         TensorDescriptor bias("bias");
         TensorDescriptor scaleA("scaleA");
         TensorDescriptor scaleB("scaleB");
-        TensorDescriptor scaleC("scaleC");
+TensorDescriptor scaleC("scaleC");
         TensorDescriptor scaleD("scaleD");
         TensorDescriptor scaleDVec("scaleDVec");
         TensorDescriptor scaleAlphaVec("scaleAlphaVec");
@@ -545,7 +545,7 @@ namespace Tensile
                                       bias,
                                       scaleA,
                                       scaleB,
-                                      scaleC,
+scaleC,
                                       scaleD,
                                       scaleDVec,
                                       scaleAlphaVec,
@@ -866,8 +866,8 @@ namespace Tensile
             }
             for(int i = 2; i < ca_sizes.size(); i++)
             {
-                ca_strides[i]       = ca_strides[i - 1] * ca_sizes[i - 1];
-                metadata_strides[i] = metadata_strides[i - 1] * metadata_sizes[i - 1];
+                ca_strides[i]       = ca_strides[i] == 0 ? 0 : ca_strides[i - 1] * ca_sizes[i - 1];
+                metadata_strides[i] = ca_strides[i] == 0 ? 0 :metadata_strides[i - 1] * metadata_sizes[i - 1];
             }
             m_tensor_compressed = TensorDescriptor("compressed",
                                                    aTensor.dataType(),
