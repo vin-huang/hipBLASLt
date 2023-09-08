@@ -246,7 +246,17 @@ namespace Tensile
             auto const& sizes      = tensor.sizes();
             auto const& sizesC     = tensorC.sizes();
             auto        sizesMeta  = tensorMeta.sizes();
+            auto const& strides    = tensor.strides();
             auto        count      = CoordCount(sizes.begin(), sizes.end());
+
+            if(sizes.size() > 2 && strides.size() > 2)
+            {
+                size_t stride = strides[2];
+                size_t batch = sizes[2];
+                if(batch > 1 && stride == 0)
+                    count /= batch;
+            }
+
             size_t      dimSize    = sizes[dim];
             size_t      loop_count = count / dimSize;
 
@@ -362,21 +372,20 @@ namespace Tensile
         {
             T* cpuCompressed
                 = (T*)std::malloc(TypeInfo<T>::ElementSize * tensorC.totalAllocatedElements());
-            unsigned char* cpuMeta = (unsigned char*)std::malloc(tensorMeta.totalLogicalElements());
+            unsigned char* cpuMeta = (unsigned char*)std::malloc(tensorMeta.totalAllocatedElements());
 
             std::memset((void*)cpuCompressed,
                         0,
                         TypeInfo<T>::ElementSize * tensorC.totalAllocatedElements());
-            std::memset((void*)cpuMeta, 0, tensorMeta.totalLogicalElements());
+            std::memset((void*)cpuMeta, 0, tensorMeta.totalAllocatedElements());
 
             //convert pruned matrix to metadata matrix and compresed sparse matrix
             compressSparseArray(
                 cpuCompressed, cpuMeta, srcBuffer, tensor, tensorC, tensorMeta, dim);
 
             //copy compressed sparse matrix and metadata matrix to GPU
-            Tensile::hip::CopyTensor(dstCompressed, cpuCompressed, tensorC, hipMemcpyHostToDevice);
-            HIP_CHECK_EXC(hipMemcpy(
-                dstMeta, cpuMeta, tensorMeta.totalLogicalElements(), hipMemcpyHostToDevice));
+            Tensile::hip::CopyBuffer(dstCompressed, cpuCompressed, TypeInfo<T>::ElementSize * tensorC.totalAllocatedElements(), hipMemcpyHostToDevice);
+            Tensile::hip::CopyBuffer(dstMeta, cpuMeta, tensorMeta.totalAllocatedBytes(), hipMemcpyHostToDevice);
 
             // free temp cpu memory
             std::free(cpuCompressed);
