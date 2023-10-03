@@ -1120,7 +1120,7 @@ defaultProblemType = {
     "HighPrecisionAccumulate":  False,            # f32 += f16*f16
     "SilentHighPrecisionAccumulate": False,       # Keep kernel names the same for HPA mode.  Useful for testing.
 
-    "SparseA":                  False,            # 4:2 Structured Sparse A Matrix
+    "SparseA":                  0,            # 4:2 Structured Sparse A Matrix
 
     "ComplexConjugateA":        False,            # complex data should be conjugated for "C" transpose case
     "ComplexConjugateB":        False,
