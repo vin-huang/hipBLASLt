@@ -861,7 +861,6 @@ namespace Tensile
             } 
             else
             {
-                std::cout << m_freeIndices << std::endl;
                 if(m_freeIndices[1].i == 0) // transpose
                 {
                     ca_sizes[1] /= 2;
