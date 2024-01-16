@@ -231,6 +231,7 @@ class StateValues:
   numSgprAddressBias: int                = 0
   BiasType: int                          = 0
   BiasStride: int                        = 0
+  BiasDim: int                           = 0
 
   numReadsPerIterA: int                  = 0
   numReadsPerIterB: int                  = 0
