@@ -695,6 +695,11 @@ namespace Tensile
                 args.template append<uint32_t>(
                     "strideBias",
                     static_cast<uint32_t>(bias.strides()[bias.dimensions() - 1])); // reserved
+                if(problemType.biasDim)
+                {
+                    args.template append<uint32_t>("biasDim",
+                                                static_cast<uint32_t>(problem.getParams().biasDim()));                    
+                }
             }
         }
 
@@ -1121,6 +1126,8 @@ namespace Tensile
         {
             TensorDescriptor const& bias = problem.tensor(ContractionProblemGemm::TENSOR::BIAS);
             rv.args.append<uint32_t>("strideBias", bias.strides()[bias.dimensions() - 1]);
+            if(problemType.biasDim)
+                rv.args.template append<uint32_t>("biasDim", (uint32_t)problem.getParams().biasDim());
         }
 
         int idx = 0;
@@ -1184,6 +1191,8 @@ namespace Tensile
         {
             auto s = TypeAbbrev(problem.bias().dataType());
             name += ("_Bias" + s);
+            if(problemType.biasDim)
+                name += "_BD";
         }
 
         if(sizeMapping.globalAccumulation)
@@ -1351,6 +1360,11 @@ namespace Tensile
         uint32_t gsu
             = problem.getParams().gsu() > 0 ? problem.getParams().gsu() : sizeMapping.globalSplitU;
         args.template append<uint32_t>(concatenate_if<T_Debug>("gsu"), gsu);
+        if(useBias)
+        {
+            if(problemType.biasDim)
+                args.template append<uint32_t>("biasDim", (uint32_t)problem.getParams().biasDim());
+        }
     }
 
     template <bool T_Debug>
@@ -1653,7 +1667,12 @@ namespace Tensile
                 }
             }
             else
+            {
                 name += ("_Bias" + s);
+                if(problemType.biasDim)
+                    name += ("_BD");
+            }
+                
         }
 
         if(problemType.useE)

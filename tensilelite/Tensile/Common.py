@@ -1018,6 +1018,9 @@ validParameters = {
 
     # 4:2 Structured Sparse A Matrix, 0=Non Sparse, 1=Sparse Matrix A, 2=Sparse Matrix B
     "Sparse":                      [0, 1, 2],
+
+    # 0 = M dim only, 1 = M and N dim
+    "BiasDim":                     [False, True],
     }
 
 
@@ -1214,7 +1217,9 @@ defaultProblemType = {
     "Activation":               False,
     "ActivationNoGuard":        False,
     # For kernels putting arguments in workspaces instead of kernel arguments, they can choose to support user arguments input instead.
-    "SupportUserArgs":          True
+    "SupportUserArgs":          True,
+
+    "BiasDim":                  False
     }
 
 defaultProblemSizes = [{"Range": [ [2880], 0, 0 ]}]
