@@ -28,7 +28,7 @@ BenchmarkProblems:
       TransposeA: False
       TransposeB: False
       UseBeta: True
-      UseBias: True
+      UseBias: 3
       Sparse: 2
       Batched: True
       Activation: True
@@ -107,7 +107,7 @@ BenchmarkProblems:
       TransposeA: True
       TransposeB: False
       UseBeta: True
-      UseBias: True
+      UseBias: 3
       Sparse: 2
       Batched: True
       Activation: True
@@ -186,7 +186,7 @@ BenchmarkProblems:
       TransposeA: False
       TransposeB: True
       UseBeta: True
-      UseBias: True
+      UseBias: 3
       Sparse: 2
       Batched: True
       Activation: True
@@ -265,7 +265,7 @@ BenchmarkProblems:
       TransposeA: True
       TransposeB: True
       UseBeta: True
-      UseBias: True
+      UseBias: 3
       Sparse: 2
       Batched: True
       Activation: True

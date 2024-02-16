@@ -28,12 +28,12 @@ BenchmarkProblems:
       TransposeA: False
       TransposeB: False
       UseBeta: True
-      UseBias: True
+      UseBias: 3
       Sparse: 2
       Batched: True
       Activation: True
       ActivationHPA: True
-      UseBias: True
+      UseBias: 3
 
     - # BenchmarkProblemSizeGroup - Standard
       InitialSolutionParameters:
@@ -108,12 +108,12 @@ BenchmarkProblems:
       TransposeA: True
       TransposeB: False
       UseBeta: True
-      UseBias: True
+      UseBias: 3
       Sparse: 2
       Batched: True
       Activation: True
       ActivationHPA: True
-      UseBias: True
+      UseBias: 3
 
     - # BenchmarkProblemSizeGroup - Standard
       InitialSolutionParameters:
@@ -188,12 +188,12 @@ BenchmarkProblems:
       TransposeA: False
       TransposeB: True
       UseBeta: True
-      UseBias: True
+      UseBias: 3
       Sparse: 2
       Batched: True
       Activation: True
       ActivationHPA: True
-      UseBias: True
+      UseBias: 3
 
     - # BenchmarkProblemSizeGroup - Standard
       InitialSolutionParameters:
@@ -268,12 +268,12 @@ BenchmarkProblems:
       TransposeA: True
       TransposeB: True
       UseBeta: True
-      UseBias: True
+      UseBias: 3
       Sparse: 2
       Batched: True
       Activation: True
       ActivationHPA: True
-      UseBias: True
+      UseBias: 3
 
     - # BenchmarkProblemSizeGroup - Standard
       InitialSolutionParameters:

@@ -32,7 +32,7 @@ BenchmarkProblems:
       Batched: True
       Activation: True
       ActivationHPA: True
-      UseBias: True
+      UseBias: 3
       BiasDataTypeList: ['s']
 
     - # BenchmarkProblemSizeGroup - Standard
@@ -104,7 +104,7 @@ BenchmarkProblems:
       Batched: True
       Activation: True
       ActivationHPA: True
-      UseBias: True
+      UseBias: 3
       BiasDataTypeList: ['s']
 
     - # BenchmarkProblemSizeGroup - Standard
@@ -176,7 +176,7 @@ BenchmarkProblems:
       Batched: True
       Activation: True
       ActivationHPA: True
-      UseBias: True
+      UseBias: 3
       BiasDataTypeList: ['s']
 
     - # BenchmarkProblemSizeGroup - Standard
@@ -248,7 +248,7 @@ BenchmarkProblems:
       Batched: True
       Activation: True
       ActivationHPA: True
-      UseBias: True
+      UseBias: 3
       BiasDataTypeList: ['s']
 
     - # BenchmarkProblemSizeGroup - Standard
