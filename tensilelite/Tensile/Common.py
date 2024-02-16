@@ -1018,9 +1018,6 @@ validParameters = {
 
     # 4:2 Structured Sparse A Matrix, 0=Non Sparse, 1=Sparse Matrix A, 2=Sparse Matrix B
     "Sparse":                      [0, 1, 2],
-
-    # 0 = M dim only, 1 = M and N dim
-    "BiasDim":                     [False, True],
     }
 
 
@@ -1140,7 +1137,7 @@ defaultProblemType = {
     "UseBeta":                  True,             # =True use beta parameter (asm will check for B=0 and optimize the write for that), =False don't use beta parameter
     "UseE":                     False,            # =True use output E to output gemm results before activation
     "Gradient":                 False,            # =True set globalWriteElements to gradient mode
-    "UseBias":                  False,            # =True use bias vector
+    "UseBias":                  0,                # =1 support bias vector on M direction, =2 support bias vector on N direction, =3 support bias vector on both M,N direction
     "BiasSrc":                  "D",              # This parameter is used in gradient + bias. Support A, B, D.
     "UseScaleAB":               False,            # =True use scaleA, scaleB
     "UseScaleCD":               False,            # =True use scaleC, scaleD
@@ -1217,9 +1214,7 @@ defaultProblemType = {
     "Activation":               False,
     "ActivationNoGuard":        False,
     # For kernels putting arguments in workspaces instead of kernel arguments, they can choose to support user arguments input instead.
-    "SupportUserArgs":          True,
-
-    "BiasDim":                  False
+    "SupportUserArgs":          True
     }
 
 defaultProblemSizes = [{"Range": [ [2880], 0, 0 ]}]

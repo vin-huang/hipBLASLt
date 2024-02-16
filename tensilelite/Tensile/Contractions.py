@@ -68,7 +68,7 @@ class ProblemType:
                  'useBeta', 'useBias', 'biasSrcWhiteList', 'useE', 'useScaleAB', 'useScaleCD', 'useScaleAlphaVec', 'biasDataTypeWhiteList',
                  'highPrecisionAccumulate', 'useInitialStridesAB', 'useInitialStridesCD', 'stridedBatched', 'groupedGemm',
                  'useGradient', 'activationType', 'activationArgLength', 'activationComputeDataType', 'activationNoGuard',
-                 'sparse', 'f32XdlMathOp', 'supportDeviceUserArguments', 'biasDim']
+                 'sparse', 'f32XdlMathOp', 'supportDeviceUserArguments']
     @classmethod
     def FromOriginalState(cls, d):
         indices = [None]*d['TotalIndices']
@@ -190,7 +190,7 @@ class ProblemType:
         if 'UseBeta' in d:
             rv.useBeta = d['UseBeta']
 
-        rv.useBias               = False
+        rv.useBias               = 0
         rv.biasDataTypeWhiteList = []
         rv.biasSrcWhiteList = []
         rv.setConstStrideBias = []
@@ -241,13 +241,6 @@ class ProblemType:
         rv.sparse = 0
         if 'Sparse' in d:
             rv.sparse = int(d['Sparse'])
-
-        rv.biasDim = False
-        if rv.useBias:
-            if 'BiasDim' in d:
-                rv.biasDim = d['BiasDim']
-            elif rv.sparse:
-                rv.biasDim = True #enable bias dim for sparse legacy kernel.
 
         rv.f32XdlMathOp = DataType(d['F32XdlMathOp']) if 'F32XdlMathOp' in d else DataType(0)
 
@@ -369,7 +362,6 @@ class ProblemType:
             predicates.append(ProblemPredicate("Sparse", value=self.sparse))
             predicates.append(ProblemPredicate("F32XdlMathOp", value=self.f32XdlMathOp))
             predicates.append(ProblemPredicate("SupportDeviceUserArguments", value=self.supportDeviceUserArguments))
-            predicates.append(ProblemPredicate("BiasDim", value=self.biasDim))
 
         return predicates
 

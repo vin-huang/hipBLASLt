@@ -586,7 +586,7 @@ namespace Tensile
             m_useE = useE;
         }
 
-        void setUseBias(bool useBias)
+        void setUseBias(int useBias)
         {
             m_useBias = useBias;
         }
@@ -611,7 +611,7 @@ namespace Tensile
             return m_useE;
         }
 
-        bool useBias() const
+        int useBias() const
         {
             return m_useBias;
         }
@@ -810,16 +810,6 @@ namespace Tensile
         int sparse() const
         {
             return m_sparse;
-        }
-
-        void setBiasDim(bool value)
-        {
-            m_biasDim = value;
-        }
-
-        bool biasDim() const
-        {
-            return m_biasDim;
         }
 
         void setKernelLanguage(KernelLanguage value)
@@ -1095,14 +1085,13 @@ namespace Tensile
         bool           m_eligibleForPK           = true;
         bool           m_useGradient             = false;
         bool           m_useE                    = false;
-        bool           m_useBias                 = false;
+        int            m_useBias                 = 0;
         bool           m_useScaleAB              = false;
         bool           m_useScaleCD              = false;
         bool           m_useScaleAlphaVec        = false;
         ActivationType m_activationType          = ActivationType::None;
         bool           m_activationNoGuard       = false;
         int            m_sparse                  = 0;
-        bool           m_biasDim                 = false;
 
         KernelLanguage    m_kernelLanguage    = KernelLanguage::Any;
         PerformanceMetric m_performanceMetric = PerformanceMetric::DeviceEfficiency;

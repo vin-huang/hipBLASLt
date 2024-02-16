@@ -95,7 +95,7 @@ class KernelWriterBetaOnly(KernelWriterBase):
 
     if self.state["ProblemType"]["BetaOnlyUseBias"]:
       kStr += "  unsigned int strideBias,%s" % (self.endLine)
-      if self.state["ProblemType"]["BiasDim"]:
+      if self.state["ProblemType"]["UseBias"] == 3:
         kStr += "  unsigned int biasDim,%s" % (self.endLine)
 
     # sizes
@@ -246,9 +246,11 @@ class KernelWriterBetaOnly(KernelWriterBase):
     biasStr = ""
     if self.state["ProblemType"]["BetaOnlyUseBias"]:
       id_str = "id0"
-      if self.state["ProblemType"]["BiasDim"]:
+      if self.state["ProblemType"]["UseBias"] == 3:
         id_str = "idb"
         kStr += "  %s idb = ( arg.biasDim == 0 ? (%s)id0 : id1);%s" % (self.uint64Str, self.uint64Str, self.endLine)
+      elif self.state["ProblemType"]["UseBias"] == 2:
+        id_str = "id1"
       if problemType["NumIndicesC"] > 2:
         biasStr = " + ((" + self.datatype + ")(Bias == 0 ? 0 : GLOBAL_BIAS((%s)%s, id2)))"% (self.uint64Str, id_str)
       else:

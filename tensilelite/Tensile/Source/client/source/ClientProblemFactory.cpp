@@ -160,9 +160,7 @@ namespace Tensile
                 m_activationEnumArg
                     = args["activation-enum-args"].as<std::vector<ActivationType>>();
             if(args.count("use-bias"))
-                m_useBias = args["use-bias"].as<bool>();
-            if(args.count("bias-dim"))
-                m_biasDim = args["bias-dim"].as<bool>();
+                m_useBias = args["use-bias"].as<int>();
             if(args.count("bias-source"))
                 m_biasSrc = args["bias-source"].as<int>();
             if(args.count("use-scaleAB"))
@@ -221,7 +219,7 @@ namespace Tensile
             rv.clear();
             int biasSize       = std::max(1, (int)m_biasTypeArgs.size());
             int activationSize = std::max(1, (int)m_activationEnumArg.size());
-            int biasDimSize    = std::max(1, m_biasDim ? (int)m_biasDimArgs.size() : 1);
+            int biasDimSize    = std::max(1, m_useBias == 3 ? (int)m_biasDimArgs.size() : 1);
             rv.reserve(m_problemSizes.size() * activationSize * biasSize * biasDimSize);
 
             std::vector<size_t> aStrides, bStrides, cStrides, dStrides, eStrides, biasStrides;
@@ -292,7 +290,6 @@ namespace Tensile
                             rv.back().setHighPrecisionAccumulate(m_highPrecisionAccumulate);
                             rv.back().setUseGradient(m_useGradient);
                             rv.back().setUseBias(m_useBias);
-                            rv.back().setBiasDim(m_biasDim);
                             rv.back().setUseE(m_useE);
                             rv.back().setKernelLanguage(m_kernelLanguage);
                             rv.back().setPerformanceMetric(m_performanceMetric);
@@ -304,8 +301,12 @@ namespace Tensile
                             {
                                 auto length       = (m_biasSrc == ContractionProblemGemm::TENSOR::B)
                                                         ? rv.back().d().sizes()[1]
-                                                        : (m_biasSrc == ContractionProblemGemm::TENSOR::D && m_biasDimArgs[l] == 1)
+                                                        : (m_useBias == 1 || (m_biasSrc != ContractionProblemGemm::TENSOR::D))
+                                                        ? rv.back().d().sizes()[0]
+                                                        : (m_useBias == 2)
                                                         ? rv.back().d().sizes()[1]
+                                                        : (m_useBias == 3)
+                                                        ? rv.back().d().sizes()[m_biasDimArgs[l]]
                                                         : rv.back().d().sizes()[0];
                                 bool isBiasOutput = m_useGradient ? true : false;
                                 auto biasStride   = biasStrides.size() < 2 ? 0 : biasStrides[2];
@@ -315,7 +316,7 @@ namespace Tensile
                                     biasStride,
                                     isBiasOutput,
                                     static_cast<ContractionProblemGemm::TENSOR>(m_biasSrc),
-                                    m_biasDim ? m_biasDimArgs[l] : 0);
+                                    m_useBias == 1 ? 0 : m_useBias == 2 ? 1 : m_biasDimArgs[l]);
                             }
                             else
                             {

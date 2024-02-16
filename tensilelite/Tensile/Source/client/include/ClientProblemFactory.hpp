@@ -75,7 +75,7 @@ namespace Tensile
             bool m_highPrecisionAccumulate;
             bool m_deterministicMode;
             bool m_cEqualsD;
-            bool m_useBias;
+            int  m_useBias;
             int  m_biasSrc;
             bool m_useScaleAB;
             bool m_useScaleCD;
@@ -97,7 +97,6 @@ namespace Tensile
             DataType                         m_activationComputeType;
             std::vector<std::vector<size_t>> m_problemSizes;
             bool                             m_useUserArgs;
-            int                              m_biasDim = 0;
         };
 
     } // namespace Client

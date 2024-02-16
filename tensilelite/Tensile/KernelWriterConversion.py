@@ -168,7 +168,7 @@ class KernelWriterConversion(KernelWriterBase):
     if self.state["ProblemType"]["UseBias"] and \
         (not self.state["ProblemType"]["Gradient"] or \
           (self.state["ProblemType"]["Gradient"] and (self.state["ProblemType"]["BiasSrc"] == "A" or self.state["ProblemType"]["BiasSrc"] == "B"))):
-      if self.state["ProblemType"]["BiasDim"]:
+      if self.state["ProblemType"]["UseBias"] == 3:
         kStr += "  unsigned int biasDim;%s" % (self.endLine)
 
     # argument structure end
@@ -406,9 +406,11 @@ class KernelWriterConversion(KernelWriterBase):
          (self.state["ProblemType"]["Gradient"] and (self.state["ProblemType"]["BiasSrc"] == "A" or self.state["ProblemType"]["BiasSrc"] == "B"))):
 
       id_str = "id0"
-      if self.state["ProblemType"]["BiasDim"]:
+      if self.state["ProblemType"]["UseBias"] == 3:
         id_str = "idb"
         kStr += "  %s idb = ( arg.biasDim == 0 ? (%s)id0 : id1);%s" % (self.uint64Str, self.uint64Str, self.endLine)
+      elif self.state["ProblemType"]["UseBias"] == 2:
+        id_str = "id1"
       if problemType["NumIndicesC"] > 2:
         kStr += "  %s idxBias = GLOBAL_BIAS((%s)%s, id2);%s" % (self.uint64Str, self.uint64Str, id_str, self.endLine)
       else:
@@ -631,7 +633,7 @@ class KernelWriterConversion(KernelWriterBase):
     #Bias
     if self.state["ProblemType"]["UseBias"] and (not self.state["ProblemType"]["Gradient"]):
       kStr += "  if(arg.Bias != 0){" + self.endLine
-      if self.state["ProblemType"]["BiasDim"]:
+      if self.state["ProblemType"]["UseBias"] == 3:
         kStr += "    if(arg.biasDim == 0){" + self.endLine
         for vIdx in range(self.num_dword_load):
           kStr += "      %s[%d] += (%s)arg.Bias[idxBias+%d];%s" % (accumStr, vIdx, intermediateDataType, vIdx, self.endLine)
@@ -640,11 +642,15 @@ class KernelWriterConversion(KernelWriterBase):
           kStr += "      %s[%d] += (%s)arg.Bias[idxBias];%s" % (accumStr, vIdx, intermediateDataType, self.endLine)
         kStr += "    }" + self.endLine
         kStr += "  }" + self.endLine
+      elif self.state["ProblemType"]["UseBias"] == 2:
+        for vIdx in range(self.num_dword_load):
+          kStr += "    %s[%d] += (%s)arg.Bias[idxBias];%s" % (accumStr, vIdx, intermediateDataType, self.endLine)
+        kStr += "  }" + self.endLine
       else:
         for vIdx in range(self.num_dword_load):
           kStr += "    %s[%d] += (%s)arg.Bias[idxBias+%d];%s" % (accumStr, vIdx, intermediateDataType, vIdx, self.endLine)
         kStr += "  }" + self.endLine
-        
+
       kStr += self.endLine
 
     #Handle E
@@ -757,8 +763,8 @@ class KernelWriterConversion(KernelWriterBase):
         name += "_BiasSrc%s"%(self.state["ProblemType"]["BiasSrc"])
       else:
         name += "_Bias%s"%self.state["ProblemType"]["BiasDataType"].toChar()
-        if self.state["ProblemType"]["BiasDim"]:
-          name += "_BD"
+        if self.state["ProblemType"]["UseBias"] > 1:
+          name += "_BD%s"%("N" if self.state["ProblemType"]["UseBias"] == 2 else "MN")
     if self.state["ProblemType"]["UseE"]:
       if self.state["ProblemType"]["Gradient"]:
         name += "_Grad%s"%self.state["ProblemType"]["DataTypeE"].toChar()

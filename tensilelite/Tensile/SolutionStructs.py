@@ -192,14 +192,9 @@ class ProblemType(Mapping):
         self["BiasDataTypeList"].sort() # Make name unique
       else:
         self["BiasDataTypeList"] = getBiasDataTypeListDefault(self)
-      if "BiasDim" in config:
-        self["BiasDim"] = config["BiasDim"]
-      else:
-        self["BiasDim"] = True if self["Sparse"] else False # Enable bias dim for sparse legacy kernel.
     else:
       self["BetaOnlyUseBias"] = False
       self["BiasDataTypeList"] = []
-      self["BiasDim"] = False
 
     # Activation
     if "Activation" in config:
@@ -500,8 +495,8 @@ class ProblemType(Mapping):
           name += i.toChar()
       if self["BiasSrc"] and self["Gradient"]: # Show bias src if gradient = True
         name += "_BiasSrc%s"%self["BiasSrc"]
-      if self["BiasDim"]:
-        name += "_BD"
+      if self["UseBias"] > 1:
+        name += "_BD%s"%("N" if self["UseBias"] == 2 else "MN")
     if self["UseE"]:
       if self["Gradient"]:
         name += "_Grad%s"%self["DataTypeE"].toChar()
@@ -970,7 +965,7 @@ class BiasDimArgs:
   def __str__(self):
     s = "BiasDimArgs\n"
     return s
-    
+
 ################################################################################
 # Activation
 ################################################################################
@@ -1150,7 +1145,7 @@ class Solution(collections.abc.Mapping):
             state = {}
             state["ProblemType"] = deepcopy(self["ProblemType"])
             state["ProblemType"]["GroupedGemm"] = False
-            state["ProblemType"]["UseBias"] = False
+            state["ProblemType"]["UseBias"] = 0
             state["KernelLanguage"] = "Source"
             state["GlobalSplitU"] = globalSplitU
             state["UnrollOnly"] = unrollOnly
@@ -1205,7 +1200,7 @@ class Solution(collections.abc.Mapping):
       state = {}
       state["ProblemType"] = deepcopy(self["ProblemType"])
       state["ProblemType"]["GroupedGemm"] = False
-      state["ProblemType"]["UseBias"] = False
+      state["ProblemType"]["UseBias"] = 0
       state["ProblemType"]["BiasDataTypeList"] = []
       state["KernelLanguage"] = "Source"
       state["_GlobalAccumulation"] = self["_GlobalAccumulation"]

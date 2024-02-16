@@ -1993,10 +1993,10 @@ namespace Tensile
                     HasIndex = false,
                     HasValue = true
                 };
-                bool value;
+                int value;
 
                 UseBiasEqual() = default;
-                UseBiasEqual(bool value)
+                UseBiasEqual(int value)
                     : value(value)
                 {
                 }
@@ -2237,8 +2237,16 @@ namespace Tensile
                                 if(problem.biasSrc() == ContractionProblemGemm::TENSOR::A
                                    || problem.biasSrc() == ContractionProblemGemm::TENSOR::D)
                                 {
-                                    auto eLength = (problem.biasSrc() == ContractionProblemGemm::TENSOR::D && problem.getParams().biasDim()) ? problem.d().sizes()[1] : problem.d().sizes()[0];
-                                    if(length != eLength)
+                                    auto eLength = (problem.useBias() == 1 || problem.biasSrc() != ContractionProblemGemm::TENSOR::D) 
+                                                     ? problem.d().sizes()[0]
+                                                     : (problem.useBias() == 2) 
+                                                     ? problem.d().sizes()[1]
+                                                     : (problem.useBias() == 3)
+                                                     ? (problem.getParams().biasDim() == 1)
+                                                     ? problem.d().sizes()[1] 
+                                                     : problem.d().sizes()[0]
+                                                     : -1;
+                                    if(length < eLength)
                                         return false;
                                 }
                                 else if(problem.biasSrc() == ContractionProblemGemm::TENSOR::B)
@@ -2390,39 +2398,6 @@ namespace Tensile
                                             "sol",
                                             value);
                     return rv;
-                }
-            };
-
-            struct BiasDim : public Predicate_CRTP<BiasDim, ContractionProblemGemm>
-            {
-                enum
-                {
-                    HasIndex = false,
-                    HasValue = true
-                };
-                bool value;
-
-                BiasDim() = default;
-                BiasDim(bool value)
-                    : value(value)
-                {
-                }
-
-                static std::string Type()
-                {
-                    return "BiasDim";
-                }
-
-                virtual bool operator()(ContractionProblemGemm const& problem) const override
-                {
-                    return problem.biasDim() == value;
-                }
-
-                virtual bool debugEval(ContractionProblemGemm const& problem,
-                                       std::ostream&                 stream) const override
-                {
-                    return debugEvalCmp(
-                        problem, stream, "prob", problem.biasDim(), "==", "sol", value);
                 }
             };
         } // namespace Contraction

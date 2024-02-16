@@ -545,7 +545,6 @@ def writeClientConfigIni(problemSizes, biasTypeArgs, biasDimArgs, activationArgs
         param('use-gradient', problemType.useGradient)
         param('use-bias',   problemType.useBias)
         param('bias-source',   problemType.biasSrcWhiteList[0])
-        param('bias-dim',  problemType.biasDim)
         param('use-e', problemType.useE)
         param('use-scaleAB',   problemType.useScaleAB)
         param('use-scaleCD',   problemType.useScaleCD)

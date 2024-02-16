@@ -484,13 +484,11 @@ class KernelWriterAssembly(KernelWriter):
         self.states.numStoreSgprNameSizes.append(self.states.BiasType)
         self.states.numStoreSgprNames.append("BiasStride")
         self.states.numStoreSgprNameSizes.append(self.states.BiasStride)
-        if kernel["ProblemType"]["BiasDim"]:
-          self.states.BiasDim = 1
+        self.states.BiasDim = kernel["ProblemType"]["UseBias"]
+        if self.states.BiasDim == 3:
           self.states.numStoreSgprNames.append("BiasDim")
-          self.states.numStoreSgprNameSizes.append(self.states.BiasDim)
-        else:
-          self.states.BiasDim = 0
-      storeSgprLoad += self.states.numSgprAddressBias + self.states.BiasType + self.states.BiasStride + self.states.BiasDim
+          self.states.numStoreSgprNameSizes.append(1)
+      storeSgprLoad += self.states.numSgprAddressBias + self.states.BiasType + self.states.BiasStride + (1 if self.states.BiasDim == 3 else 0)
     if kernel["ProblemType"]["UseE"]:
       storeSgprLoad += self.states.rpga + self.states.e.numSgprStrides
       self.states.numStoreSgprNames.append("AddressE")
@@ -4266,7 +4264,7 @@ class KernelWriterAssembly(KernelWriter):
           loadList.append([-1, 0, extArgOffset])  # Need to start a new loadAllKernArg cause the argument is not consecutively anymore.
         extArgOffset += self.states.userArgsInfo.biasSize
         if self.states.numSgprAddressBias:
-          biasLoadSize = (self.states.numSgprAddressBias + self.states.BiasType + self.states.BiasStride + self.states.BiasDim) * 4
+          biasLoadSize = (self.states.numSgprAddressBias + self.states.BiasType + self.states.BiasStride + (1 if self.states.BiasDim == 3 else 0)) * 4
           if loadList[-1][0] == -1:
             loadList[-1][0] = self.sgprs["AddressBias"]
           loadList[-1][1] += biasLoadSize
@@ -8105,11 +8103,13 @@ class KernelWriterAssembly(KernelWriter):
           module.add(SAddU32(dst=sgpr(tmpSgpr), src0=sgpr("WorkGroup2"), src1=hex(1)))
           module.add(SMulI32(dst=sgpr(tmpSgpr), src0=sgpr("BiasStride"), src1=sgpr(tmpSgpr), comment="stride * (wg+1)"))
           module.add(SCmpEQU32(sgpr(tmpSgpr), hex(0), comment="bias stride = 0?"))
-          if self.states.BiasDim:
+          if self.states.BiasDim == 3:
             module.add(SCBranchSCC0(set_bs_label.getLabelName()))
             module.add(SCmpKEQU32(src=sgpr("BiasDim"), simm16=hex(0), comment="BiasDim == 0"))
             module.add(SCSelectB32(dst=sgpr(tmpSgpr), src0=sgpr("SizeI"), src1=sgpr("SizeJ")))
             module.add(set_bs_label)
+          elif self.states.BiasDim == 2:
+            module.add(SCSelectB32(dst=sgpr(tmpSgpr), src0=sgpr("SizeJ"), src1=sgpr(tmpSgpr)))
           else:
             module.add(SCSelectB32(dst=sgpr(tmpSgpr), src0=sgpr("SizeI"), src1=sgpr(tmpSgpr)))
           module.add(allocPostLoopSrdSuppress("Bias", labelStr, sgprLength=sgpr(tmpSgpr)))
@@ -8119,24 +8119,26 @@ class KernelWriterAssembly(KernelWriter):
         biasDim1Label = Label(self.labels.getNameInc("Load_BiasDim_1"), "")
         loadBiasEndLabel = Label(self.labels.getNameInc("Load_Bias_End"), "")
         biasDims = [0]
-        if self.states.BiasDim:
+        if self.states.BiasDim == 3:
           module.add(biasDim0Label)
           module.add(SCmpKLGU32(sgpr("BiasDim"), 0, "BiasDim != 0"))
           module.add(SCBranchSCC1(biasDim1Label.getLabelName(), "Branch if true"))
           biasDims.append(1)
+        elif self.states.BiasDim == 2:
+          biasDims = [1]
 
-        for d in biasDims:
+        for d in range(len(biasDims)):
           if d == 1:
             module.add(biasDim1Label)
           multiBiasTypeLabel = []
           for i in kernel["ProblemType"]["BiasDataTypeList"]:
-            name = self.labels.getNameInc("Load_Bias%s_%u"%(i.toNameAbbrev(), d))
+            name = self.labels.getNameInc("Load_Bias%s_%u"%(i.toNameAbbrev(), biasDims[d]))
             multiBiasTypeLabel.append(Label(name, ""))
           multiBiasTypeLabel.append(loadBiasEndLabel)
           offsetVgpr  = self.vgprPool.checkOut(1, 1)
           with self.allocTmpSgpr(1, 1) as tmpSgprRes:
             if len(kernel["ProblemType"]["BiasDataTypeList"]) == 1:
-              module.add(self.readBiasToLDS(kernel["ProblemType"]["BiasDataTypeList"][0], kernel, 1, offsetVgpr, tmpSgprRes.idx, tmpVgprRes, d))
+              module.add(self.readBiasToLDS(kernel["ProblemType"]["BiasDataTypeList"][0], kernel, 1, offsetVgpr, tmpSgprRes.idx, tmpVgprRes, biasDims[d]))
               if len(biasDims) == 2:
                 if d == 0:
                   module.add(SBranch(labelName=loadBiasEndLabel.getLabelName(), comment="Branch to load bias end"))
@@ -8148,9 +8150,9 @@ class KernelWriterAssembly(KernelWriter):
                 module.add(multiBiasTypeLabel[i])
                 module.add(SCmpKLGU32(sgpr("BiasType"), typeValue, "BiasType != %u"%typeValue))
                 module.add(SCBranchSCC1(label.getLabelName(), "Branch if true"))
-                module.add(self.readBiasToLDS(kernel["ProblemType"]["BiasDataTypeList"][i], kernel, 1, offsetVgpr, tmpSgprRes.idx, tmpVgprRes, d))
+                module.add(self.readBiasToLDS(kernel["ProblemType"]["BiasDataTypeList"][i], kernel, 1, offsetVgpr, tmpSgprRes.idx, tmpVgprRes,  biasDims[d]))
                 module.add(SBranch(labelName=loadBiasEndLabel.getLabelName(), comment="Branch to load bias end"))
-              if d == biasDims[len(biasDims) -1]:
+              if d == len(biasDims) -1:
                 module.add(loadBiasEndLabel)
           self.vgprPool.checkIn(offsetVgpr)
         self.vgprPool.checkIn(tmpVgpr)
@@ -8275,7 +8277,7 @@ class KernelWriterAssembly(KernelWriter):
       if edges is None:
         edges = [False, True] if self.do["EdgeWrite"] else [False]
       if biasDims is None:
-        biasDims = [0, 1] if self.states.BiasDim else [0]
+        biasDims = [0, 1] if self.states.BiasDim == 3 else [1] if self.states.BiasDim == 2 else [0]
       writeLabels = {}
       for beta in betas:
         writeLabels[beta] = {}
@@ -8283,8 +8285,11 @@ class KernelWriterAssembly(KernelWriter):
           writeLabels[beta]["EdgeCheck0"] = Label(self.labels.getNameInc("GW_B%u_E%u_EdgeCheck0" % ( 1 if beta else 0, 1 if edge else 0) ), "")
           writeLabels[beta]["EdgeCheck1"] = Label(self.labels.getNameInc("GW_B%u_E%u_EdgeCheck1" % ( 1 if beta else 0, 1 if edge else 0) ), "")
           writeLabels[beta][edge] = {}
-          for biasDim in biasDims:
-            writeLabels[beta][edge][biasDim] = Label(self.labels.getNameInc("GW_B%u_E%u_BD%u" % ( 1 if beta else 0, 1 if edge else 0, biasDim) ), "")
+          if len(biasDims) == 1:
+             writeLabels[beta][edge][biasDims[0]] = Label(self.labels.getNameInc("GW_B%u_E%u" % ( 1 if beta else 0, 1 if edge else 0) ), "")
+          else:
+            for biasDim in biasDims:
+              writeLabels[beta][edge][biasDim] = Label(self.labels.getNameInc("GW_B%u_E%u_BD%u" % ( 1 if beta else 0, 1 if edge else 0, biasDim) ), "")
       endLabel = Label(self.labels.getNameInc("GW_End"), "")
 
       # Layout
@@ -8690,7 +8695,7 @@ class KernelWriterAssembly(KernelWriter):
            isLongBranch = True if currentInstLength >= 16384 else False
            with self.allocTmpSgpr(3) as tmpSgprInfo:
              checkIsBiasDimZero = edgeModule.add(self.checkIsBiasDimZero(kernel, tmpSgprInfo, \
-               writeLabels[beta][edge][1], isLongBranch=isLongBranch), pos=edge_mode_pos)
+               writeLabels[beta][edge][biasDims[1]], isLongBranch=isLongBranch), pos=edge_mode_pos)
              currentInstLength += checkIsBiasDimZero.countType(Instruction)
 
           betaModule.add(edgeModule, pos=mod_pos)
@@ -8700,7 +8705,7 @@ class KernelWriterAssembly(KernelWriter):
           isLongBranch = True if currentInstLength >= 16384 else False
           with self.allocTmpSgpr(4) as tmpSgprInfo:
             checkIsEdge = betaModule.add(self.checkIsEdge(kernel, tmpSgprInfo, \
-              writeLabels[beta][True][0], isLongBranch=isLongBranch), pos=mod_pos)
+              writeLabels[beta][True][biasDims[0]], isLongBranch=isLongBranch), pos=mod_pos)
             currentInstLength += checkIsEdge.countType(Instruction)
         betaModules.add(betaModule, pos=0)
 
