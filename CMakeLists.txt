@@ -163,14 +163,18 @@ else()
     option( Tensile_MERGE_FILES "Tensile to merge kernels and solutions files?" ON )
     option( Tensile_SHORT_FILENAMES "Tensile to use short file names? Use if compiler complains they're too long." OFF )
     option( Tensile_PRINT_DEBUG "Tensile to print runtime debug info?" OFF )
-
+  
+    if (NOT Tensile_BUILD_ID)
+      set(Tensile_BUILD_ID "sha1" CACHE STRING "Build ID Kind for Tensile" FORCE)
+    endif()
+    
     set( Tensile_TEST_LOCAL_PATH "" CACHE PATH "Use local Tensile directory instead of fetching a GitHub branch" )
 
     set_property( CACHE Tensile_LOGIC PROPERTY STRINGS aldebaran asm_full asm_lite asm_miopen hip_lite other )
     set_property( CACHE Tensile_CODE_OBJECT_VERSION PROPERTY STRINGS default V4 V5 )
     set_property( CACHE Tensile_COMPILER PROPERTY STRINGS hcc hipcc)
     set_property( CACHE Tensile_LIBRARY_FORMAT PROPERTY STRINGS msgpack yaml)
-
+    
     if(Tensile_LIBRARY_FORMAT MATCHES "yaml")
       option(TENSILE_USE_LLVM      "Use LLVM for parsing config files." ON)
       option(TENSILE_USE_MSGPACK   "Use msgpack for parsing config files." OFF)
