@@ -498,8 +498,11 @@ class ProblemType(Mapping):
           name += i.toChar()
       if self["BiasSrc"] and self["Gradient"]: # Show bias src if gradient = True
         name += "_BiasSrc%s"%self["BiasSrc"]
-      if self["UseBias"] > 1:
-        name += "_BD%s"%("N" if self["UseBias"] == 2 else "MN")
+
+    factorDim = max(self["UseScaleAlphaVec"], self["UseBias"])
+    if factorDim > 1 :
+        name += "_FD%s"%("N" if factorDim == 2 else "MN")
+
     if self["UseE"]:
       if self["Gradient"]:
         name += "_Grad%s"%self["DataTypeE"].toChar()
@@ -913,6 +916,28 @@ class ProblemSizes:
     return s
 
 ################################################################################
+# Factor Type
+################################################################################
+
+class FactorDimArgs:
+
+  ########################################
+  def __init__(self, problemType, config):
+    self.factorDims = []
+    self.totalProblemSizes = 0
+    if problemType["UseScaleAlphaVec"] or problemType["UseBias"]:
+      for fdim in config:
+        dim = int(fdim)
+        if dim not in [0, 1]:
+          printWarning("Factor Dim: must be 0 or 1, current is %s."%(dim))
+        self.factorDims.append(dim)
+      self.totalProblemSizes = len(self.factorDims)
+
+  def __str__(self):
+    s = "FactorDimArgs\n"
+    return s
+
+################################################################################
 # Bias Type
 ################################################################################
 
@@ -949,24 +974,6 @@ class BiasTypeArgs:
 
   def __str__(self):
     s = "BiasTypesArgs\n"
-    return s
-
-class BiasDimArgs:
-
-  ########################################
-  def __init__(self, problemType, config):
-    self.biasDims = []
-    self.totalProblemSizes = 0
-    if problemType["UseBias"]:
-      for bdim in config:
-        dim = int(bdim)
-        if dim not in [0, 1]:
-          printWarning("Bias Dim: must be 0 or 1, current is %s."%(dim))
-        self.biasDims.append(dim)
-      self.totalProblemSizes = len(self.biasDims)
-
-  def __str__(self):
-    s = "BiasDimArgs\n"
     return s
 
 ################################################################################
