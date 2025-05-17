@@ -1271,7 +1271,6 @@ class Solution(collections.abc.Mapping):
           state["VectorWidthA"] = 1
       else:
         state["VectorWidthA"] = 1
-
     if state["VectorWidthB"] == -1:
       if state["EnableMatrixInstruction"]:
         regPerElem = state["ProblemType"]["DataType"].numRegisters()
@@ -1286,7 +1285,6 @@ class Solution(collections.abc.Mapping):
           state["VectorWidthB"] = 1
       else:
         state["VectorWidthB"] = 1
-
     if state["ProblemType"]["Sparse"] and not state["DirectToVgprSparseMetadata"]:
       state["VectorWidthMetadata"] = state["VectorWidthA"] if state["ProblemType"]["Sparse"] == 1 else state["VectorWidthB"]
 

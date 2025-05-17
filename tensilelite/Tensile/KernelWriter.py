@@ -887,6 +887,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
         if self.states.lrvwTileMetadata > 1:
           if kernel["MIInputPerThreadMetadata"] == 1:
             instPerPackM = 1.5
+          elif kernel["MIInputPerThreadMetadata"] == 4:
+            instPerPackM = 3
         elif kernel["MIInputPerThreadMetadata"] == 4:
           instPerPackM = 3
       packItems = []
