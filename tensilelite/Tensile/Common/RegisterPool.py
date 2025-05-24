@@ -63,7 +63,7 @@ class RegisterPool:
   ########################################
   # Init
   # defaultPreventOverflow: control behavior of checkout and checkoutAligned when preventOverflow is not explicitly specificed.
-  def __init__(self, size, type, defaultPreventOverflow, printRP=0):
+  def __init__(self, size, type, defaultPreventOverflow, printRP=0, states=None):
     self.printRP=printRP
     self.type = type
     self.defaultPreventOverflow = defaultPreventOverflow
@@ -72,6 +72,7 @@ class RegisterPool:
     self.checkOutSizeTemp = {}
     self.occupancyLimitSize    = 0
     self.occupancyLimitMaxSize = 0
+    self.states = states
 
   #######################################
   # Set occupancy limit
@@ -236,8 +237,11 @@ class RegisterPool:
       oldSize = len(self.pool)
       if self.occupancyLimitSize > 0:
         if newSize > self.occupancyLimitSize and newSize <= self.occupancyLimitMaxSize:
-          print("newSize", newSize, "OldSIze", oldSize, "Limit", self.occupancyLimitSize)
-          assert self.occupancyLimitSize >= newSize
+          print(self.type, "newSize", newSize, "OldSIze", oldSize, "Limit", self.occupancyLimitSize)
+          if self.states == None:
+            assert self.occupancyLimitSize >= newSize
+          else:
+            self.states.overflowedResources = 4
       overflow = newSize - oldSize
       #print "Overflow: ", overflow
       for i in range(start, len(self.pool)):

@@ -4477,7 +4477,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     ####################################
     # num sgprs: initial kernel state
-    self.sgprPool = RegisterPool(0, 's', defaultPreventOverflow=True, printRP=0)
+    self.sgprPool = RegisterPool(0, 's', defaultPreventOverflow=True, printRP=0, states=self.states)
     numSgprAddressD = self.states.rpga # til end
     numSgprAddressC = self.states.rpga # til end
     numSgprAddressA = self.states.rpga # til read offsets
@@ -4786,12 +4786,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
     ########################################
     #print "TotalVgprs", self.states.totalVgprs
     self.vgprPool = RegisterPool(self.states.totalVgprs, 'v', defaultPreventOverflow=False,
-                                 printRP=self.db["PrintRP"])
+                                 printRP=self.db["PrintRP"], states=self.states)
     self.savedVgprPool = None
     self.savedSgprPool = None
 
     ## accumulator Buffer for storeCinUnroll feature
-    self.agprPool = RegisterPool(self.states.totalAgprs, 'a', defaultPreventOverflow=False, printRP=0)
+    self.agprPool = RegisterPool(self.states.totalAgprs, 'a', defaultPreventOverflow=False, printRP=0, states=self.states)
 
     ########################################
     # reads Per Iteration
