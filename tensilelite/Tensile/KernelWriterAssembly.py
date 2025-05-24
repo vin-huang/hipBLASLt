@@ -11444,15 +11444,16 @@ class KernelWriterAssembly(KernelWriter):
         module.add(SCBranchSCC0(labelName=reductionStartLabel.getLabelName(), comment="branch if GSU != 1"))
         module.add(SMovB64(dst=sgpr("SrdTD+0", 2), src=sgpr("SrdD+0", 2), comment="SrdTD = SrdD for GSU == 1"))
         module.add(SMovB64(dst=sgpr("SrdTD+2", 2), src=sgpr("SrdD+2", 2), comment="SrdTD = SrdD for GSU == 1"))
-        module.add(SBranch(labelName=reductionEndLabel.getLabelName(), comment="branch if GSU == 1"))
-
+        branchReductionEndModule = Module("branchReductionEnd_placeholder")
+        branchReductionEndModule.addComment1("branch if GSU == 1")
+        module.add(branchReductionEndModule)
       gsuComponent = Component.GSU.find(self)
       if kernel["GlobalSplitU"] > 1 and kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel":
         module.add(reductionStartLabel)
         module.add(gsuComponent.reductionBranches(self, kernel, tPB, vectorWidths_1, elements_1, tmpVgpr, cvtVgprStruct, \
           vectorDataTypes, factorDims, endLabel))
         module.add(reductionEndLabel)
-
+        self.updateBranchPlaceHolder(module, ["branchReductionEnd_placeholder"], ["Reduction_End"], ["SBranch"])
 
       betaModules = Module("Betas")
       currentInstLength = 0
