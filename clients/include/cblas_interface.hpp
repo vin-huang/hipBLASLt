@@ -39,7 +39,8 @@
 
 // gemm
 template <typename Tc>
-void cblas_gemm(hipblasOperation_t       transA,
+void cblas_gemm(CBLAS_ORDER              order,
+                hipblasOperation_t       transA,
                 hipblasOperation_t       transB,
                 int64_t                  m,
                 int64_t                  n,
@@ -68,7 +69,8 @@ void cblas_gemm(hipblasOperation_t       transA,
                 bool                     isScaleAMXFormat = false,
                 bool                     isScaleBMXFormat = false);
 
-inline void cblas_gemm(hipblasOperation_t       transA,
+inline void cblas_gemm(CBLAS_ORDER              order,
+                       hipblasOperation_t       transA,
                        hipblasOperation_t       transB,
                        int64_t                  m,
                        int64_t                  n,
@@ -100,7 +102,8 @@ inline void cblas_gemm(hipblasOperation_t       transA,
     switch(tc)
     {
     case HIP_R_16F: // setting compute_type to f16_r will fallback to f32_r
-        cblas_gemm<hipblasLtHalf>(transA,
+        cblas_gemm<hipblasLtHalf>(order,
+                                  transA,
                                   transB,
                                   m,
                                   n,
@@ -128,7 +131,8 @@ inline void cblas_gemm(hipblasOperation_t       transA,
                                   alt);
         return;
     case HIP_R_32F:
-        cblas_gemm<float>(transA,
+        cblas_gemm<float>(order,
+                          transA,
                           transB,
                           m,
                           n,
@@ -159,7 +163,8 @@ inline void cblas_gemm(hipblasOperation_t       transA,
 
         return;
     case HIP_R_64F:
-        cblas_gemm<double>(transA,
+        cblas_gemm<double>(order,
+                           transA,
                            transB,
                            m,
                            n,
@@ -187,7 +192,8 @@ inline void cblas_gemm(hipblasOperation_t       transA,
                            alt);
         return;
     case HIP_R_32I:
-        cblas_gemm<int32_t>(transA,
+        cblas_gemm<int32_t>(order,
+                            transA,
                             transB,
                             m,
                             n,

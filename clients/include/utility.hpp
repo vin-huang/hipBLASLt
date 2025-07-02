@@ -470,7 +470,7 @@ void print_strided_batched(
     using Tp              = std::conditional_t<is_int, int32_t, float>;
     // n1, n2, n3 are matrix dimensions, sometimes called m, n, batch_count
     // s1, s1, s3 are matrix strides, sometimes called 1, lda, stride_a
-    hipblaslt_cout << "---------- " << name << " ----------\n";
+    hipblaslt_cout << "---------- " << name << "(" << n1 << "," << n2 << "," << n3 << "," << s1 << "," << s2 << "," << s3 <<  ") ----------\n";
     int max_size = 128;
 
     for(int i3 = 0; i3 < n3 && i3 < max_size; i3++)
@@ -479,7 +479,7 @@ void print_strided_batched(
         {
             for(int i2 = 0; i2 < n2 && i2 < max_size; i2++)
             {
-                hipblaslt_cout << static_cast<Tp>(A[(i1 * s1) + (i2 * s2) + (i3 * s3)]) << "|";
+                hipblaslt_cout << "[" << (i1 * s1) + (i2 * s2) + (i3 * s3) << "]" << static_cast<Tp>(A[(i1 * s1) + (i2 * s2) + (i3 * s3)]) << "|";
             }
             hipblaslt_cout << "\n";
         }

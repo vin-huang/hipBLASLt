@@ -882,7 +882,8 @@ void small_gemm(hipblasOperation_t transA,
 }
 
 template <typename Tc>
-void cblas_gemm(hipblasOperation_t       transA,
+void cblas_gemm(CBLAS_ORDER              order,
+                hipblasOperation_t       transA,
                 hipblasOperation_t       transB,
                 int64_t                  m,
                 int64_t                  n,
@@ -929,9 +930,10 @@ void cblas_gemm(hipblasOperation_t       transA,
     hipDataType TciACast = (TciA == HIP_R_32I) ? HIP_R_64F : TciA;
     hipDataType TciBCast = (TciB == HIP_R_32I) ? HIP_R_64F : TciB;
 
-    size_t sizeA          = (transA == HIPBLAS_OP_N ? k : m) * size_t(lda);
-    size_t sizeB          = (transB == HIPBLAS_OP_N ? n : k) * size_t(ldb);
-    size_t sizeC          = n * size_t(ldc);
+    CBLAS_ORDER _order = CBLAS_ORDER(order);
+    size_t sizeA          = (_order == CblasColMajor ? (transA == HIPBLAS_OP_N ? k : m) * size_t(lda) : (transA == HIPBLAS_OP_N ? m : k) * size_t(lda));
+    size_t sizeB          = (_order == CblasColMajor ? (transB == HIPBLAS_OP_N ? n : k) * size_t(ldb) : (transB == HIPBLAS_OP_N ? k : n) * size_t(ldb));
+    size_t sizeC          = (_order == CblasColMajor ?  n * size_t(ldc) : m * size_t(ldc));
     size_t scaleAVec_size = isScaleAVec ? m : 1;
     size_t scaleBVec_size = isScaleBVec ? n : 1;
 
@@ -1032,10 +1034,25 @@ void cblas_gemm(hipblasOperation_t       transA,
     //printf("transA: hipblaslt =%d, cblas=%d\n", transA, HIPOperationToCBLASTanspose(transA) );
     if constexpr(std::is_same<TcCast, float>::value)
     {
-        static constexpr int64_t small = 600; // seeing random NaNs with blis on some small sizes
+        hipblaslt_cout << order << ","
+               << HIPOperationToCBLASTanspose(transA)<< ","
+               << HIPOperationToCBLASTanspose(transB)<< ","
+               << m<< ","
+               << n<< ","
+               << k<< ","
+               << alphaCast<< ","
+               << A_Tc<< ","
+               << lda<< ","
+               << B_Tc<< ","
+               << ldb<< ","
+               << betaCast<< ","
+               << C_Tc<< ","
+               << ldc << std::endl;
+
+        static constexpr int64_t small = 0; // seeing random NaNs with blis on some small sizes
         if(m > small || n > small || k > small || lda > small || ldb > small || ldc > small)
         {
-            cblas_sgemm(CblasColMajor,
+            cblas_sgemm(_order,
                         HIPOperationToCBLASTanspose(transA),
                         HIPOperationToCBLASTanspose(transB),
                         m,
@@ -1061,7 +1078,7 @@ void cblas_gemm(hipblasOperation_t       transA,
         static constexpr int64_t small = 600; // seeing random NaNs with blis on some small sizes
         if(m > small || n > small || k > small || lda > small || ldb > small || ldc > small)
         {
-            cblas_dgemm(CblasColMajor,
+            cblas_dgemm(_order,
                         HIPOperationToCBLASTanspose(transA),
                         HIPOperationToCBLASTanspose(transB),
                         m,
@@ -1097,7 +1114,8 @@ void cblas_gemm(hipblasOperation_t       transA,
 }
 
 #define CREATEFUNCTION(Tc)                                                  \
-    template void cblas_gemm<Tc>(hipblasOperation_t       transA,           \
+    template void cblas_gemm<Tc>(CBLAS_ORDER              order,            \
+                                 hipblasOperation_t       transA,           \
                                  hipblasOperation_t       transB,           \
                                  int64_t                  m,                \
                                  int64_t                  n,                \

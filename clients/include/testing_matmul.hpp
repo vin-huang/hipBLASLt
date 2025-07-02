@@ -831,7 +831,17 @@ void check(hipStream_t                   stream,
            hipDataType                   To,
            hipDataType                   Tbias,
            hipDataType                   Taux,
-           hipDataType                   Tc)
+           hipDataType                   Tc,
+           std::vector<HipHostBuffer>&   hA,
+           std::vector<HipHostBuffer>&   hB,
+           const std::vector<int64_t>&   A_row,
+           const std::vector<int64_t>&   A_col,
+           const std::vector<int64_t>&   B_row,
+           const std::vector<int64_t>&   B_col,
+           const std::vector<int64_t>&   lda,
+           const std::vector<int64_t>&   ldb,
+           const std::vector<int64_t>&   stride_a,
+           const std::vector<int64_t>&   stride_b)
 {
     // fetch GPU
     CHECK_HIP_ERROR(hipStreamSynchronize(stream));
@@ -1030,6 +1040,41 @@ void check(hipStream_t                   stream,
 
         if(arg.allclose_check)
         {
+
+            if(arg.print_tensor)
+            {
+                //restore original M,N,K
+                auto _M = M[gemmIdx];
+                auto _N = N[gemmIdx];
+                auto _A_row = A_row[gemmIdx];
+                auto _A_col = A_col[gemmIdx];
+                auto _B_row = B_row[gemmIdx];
+                auto _B_col = B_col[gemmIdx];
+                
+                auto _lda = lda[gemmIdx];
+                auto _ldb = ldb[gemmIdx];
+                auto _ldd = ldd[gemmIdx];
+
+                auto _a_n1 = static_cast<decltype(_lda)>(1);
+                auto _a_n2 = _lda;
+                auto _b_n1 = static_cast<decltype(_ldb)>(1);
+                auto _b_n2 = _ldb;
+                auto _d_n1 = static_cast<decltype(_ldd)>(1);
+                auto _d_n2 = _ldd;
+                if(arg.order)
+                {
+                    _a_n2 = _A_col;
+                    _b_n2 = _B_col;
+                    _d_n2 = _N;
+                    std::swap(_a_n1, _a_n2);
+                    std::swap(_b_n1, _b_n2);
+                    std::swap(_d_n1, _d_n2);
+                }
+                print_strided_batched<hipblasLtHalf>("hA", static_cast<hipblasLtHalf*>(hA[gemmIdx].buf()), _A_row, _A_col, num_batches[gemmIdx], _a_n1, _a_n2, stride_a[gemmIdx]);
+                print_strided_batched<hipblasLtHalf>("hB", static_cast<hipblasLtHalf*>(hB[gemmIdx].buf()), _B_row, _B_col, num_batches[gemmIdx], _b_n1, _b_n2, stride_b[gemmIdx]);
+                print_strided_batched<hipblasLtHalf>("hD_gold", static_cast<hipblasLtHalf*>(hD_gold[gemmIdx].buf()), _M, _N, num_batches[gemmIdx], _d_n1, _d_n2, stride_d[gemmIdx]);
+                print_strided_batched<hipblasLtHalf>("hD1", static_cast<hipblasLtHalf*>(hD_1[gemmIdx].buf()), _M, _N, num_batches[gemmIdx], _d_n1, _d_n2, stride_d[gemmIdx]);
+            }
             bool is_allclose = allclose_check_general('F',
                                                       M[gemmIdx],
                                                       N[gemmIdx],
@@ -1292,6 +1337,7 @@ void testing_matmul_with_bias(const Arguments& arg,
     double gpu_time_used, cpu_time_used, gpu_mem_gbytes;
     gpu_time_used = cpu_time_used = gpu_mem_gbytes = 0.0;
     bool                   HMM                     = arg.HMM;
+    bool                   order                   = arg.order;
     hipblaslt_local_handle handle{arg};
     hipStream_t            stream;
     CHECK_HIP_ERROR(hipStreamCreate(&stream));
@@ -1466,16 +1512,41 @@ void testing_matmul_with_bias(const Arguments& arg,
     // Calculating block count end
     matmul.resize(block_count, std::vector<hipblasLtMatmulDesc_t>(gemm_count));
 
+    auto _transA = transA;
+    auto _transB = transB;
     for(int i = 0; i < gemm_count; i++)
     {
-        CHECK_HIPBLASLT_ERROR(
-            hipblasLtMatrixLayoutCreate(&(matA[i]), arg.a_type, A_row[i], A_col[i], lda[i]));
-        CHECK_HIPBLASLT_ERROR(
-            hipblasLtMatrixLayoutCreate(&(matB[i]), arg.b_type, B_row[i], B_col[i], ldb[i]));
-        CHECK_HIPBLASLT_ERROR(
-            hipblasLtMatrixLayoutCreate(&(matC[i]), arg.c_type, M[i], N[i], ldc[i]));
-        CHECK_HIPBLASLT_ERROR(
-            hipblasLtMatrixLayoutCreate(&(matD[i]), arg.d_type, M[i], N[i], ldd[i]));
+        if(order)
+        {
+            hipblaslt_cout << "ROW MAJOR" << std::endl;
+            auto _lda = A_col[i];
+            auto _ldb = B_col[i];
+            auto _ldc = N[i];
+            auto _ldd = N[i];
+            CHECK_HIPBLASLT_ERROR(
+                hipblasLtMatrixLayoutCreate(&(matA[i]), arg.a_type, A_col[i], A_row[i], _lda));
+            CHECK_HIPBLASLT_ERROR(
+                hipblasLtMatrixLayoutCreate(&(matB[i]), arg.b_type, B_col[i], B_row[i], _ldb));
+            CHECK_HIPBLASLT_ERROR(
+                hipblasLtMatrixLayoutCreate(&(matC[i]), arg.c_type, N[i], M[i], _ldc));
+            CHECK_HIPBLASLT_ERROR(
+                hipblasLtMatrixLayoutCreate(&(matD[i]), arg.d_type, N[i], M[i], _ldd));
+            std::swap(_transA, _transB);
+            //_transA = transA == HIPBLAS_OP_N ? HIPBLAS_OP_T : HIPBLAS_OP_N;
+            //_transB = transB == HIPBLAS_OP_N ? HIPBLAS_OP_T : HIPBLAS_OP_N;
+        }
+        else
+        {
+            hipblaslt_cout << "COLUMN MAJOR" << std::endl;
+            CHECK_HIPBLASLT_ERROR(
+                hipblasLtMatrixLayoutCreate(&(matA[i]), arg.a_type, A_row[i], A_col[i], lda[i]));
+            CHECK_HIPBLASLT_ERROR(
+                hipblasLtMatrixLayoutCreate(&(matB[i]), arg.b_type, B_row[i], B_col[i], ldb[i]));
+            CHECK_HIPBLASLT_ERROR(
+                hipblasLtMatrixLayoutCreate(&(matC[i]), arg.c_type, M[i], N[i], ldc[i]));
+            CHECK_HIPBLASLT_ERROR(
+                hipblasLtMatrixLayoutCreate(&(matD[i]), arg.d_type, M[i], N[i], ldd[i]));
+        }
 
         if(arg.swizzle_a && isSwizzleSupported(TiA))
         {
@@ -1545,9 +1616,9 @@ void testing_matmul_with_bias(const Arguments& arg,
             HIPBLAS_STATUS_SUCCESS);
 
         CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescSetAttribute(
-            matmul[0][i], HIPBLASLT_MATMUL_DESC_TRANSA, &transA, sizeof(int32_t)));
+            matmul[0][i], HIPBLASLT_MATMUL_DESC_TRANSA, &_transA, sizeof(int32_t)));
         CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescSetAttribute(
-            matmul[0][i], HIPBLASLT_MATMUL_DESC_TRANSB, &transB, sizeof(int32_t)));
+            matmul[0][i], HIPBLASLT_MATMUL_DESC_TRANSB, &_transB, sizeof(int32_t)));
 
         if(arg.bias_vector)
         {
@@ -2501,16 +2572,16 @@ void testing_matmul_with_bias(const Arguments& arg,
                     if(arg.use_ext_setproblem)
                     {
                         for(int32_t b = 0; b < block_count; b++)
-                            CHECK_HIPBLASLT_ERROR(gemmVec[b].setProblem(M[0],
-                                                                        N[0],
+                            CHECK_HIPBLASLT_ERROR(gemmVec[b].setProblem(order ? N[0] : M[0],
+                                                                        order ? M[0] : N[0],
                                                                         K[0],
                                                                         num_batches[0],
-                                                                        lda[0],
-                                                                        ldb[0],
+                                                                        order ? B_col[0] : lda[0],
+                                                                        order ? A_col[0] : ldb[0],
                                                                         ldc[0],
                                                                         ldd[0],
-                                                                        stride_a[0],
-                                                                        stride_b[0],
+                                                                        order ? stride_b[0] : stride_a[0],
+                                                                        order ? stride_a[0] : stride_b[0],
                                                                         stride_c[0],
                                                                         stride_d[0],
                                                                         extepilogue[0],
@@ -2520,18 +2591,22 @@ void testing_matmul_with_bias(const Arguments& arg,
                     else
                     {
                         for(int32_t b = 0; b < block_count; b++)
+                        {
+                            auto _da = (dA[0].as<char>()) + b * size_dA[0] * realDataTypeSize(TiA);
+                            auto _db = (dB[0].as<char>()) + b * size_B[0] * realDataTypeSize(TiB);
                             CHECK_HIPBLASLT_ERROR(gemmVec[b].setProblem(
                                 matmul[b][0],
                                 alpha_in[0],
-                                (dA[0].as<char>()) + b * size_dA[0] * realDataTypeSize(TiA),
-                                matA[0],
-                                (dB[0].as<char>()) + b * size_B[0] * realDataTypeSize(TiB),
-                                matB[0],
+                                order? _db : _da,
+                                order? matB[0] : matA[0],
+                                order? _da : _db,
+                                order? matA[0] : matB[0],
                                 &h_beta[0],
                                 (dC[0].as<char>()) + b * size_C[0] * realDataTypeSize(To),
                                 matC[0],
                                 ((*dDp)[0].as<char>()) + b * size_D[0] * realDataTypeSize(To),
                                 matD[0]));
+                        }
                     }
                     for(int j = 0; j < returnedAlgoCount; j++)
                     {
@@ -2562,8 +2637,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                             if(hipblaslt_ext::matmulIsAlgoSupported(handle,
                                                                     matmul[0][0],
                                                                     alpha_in[0],
-                                                                    matA[0],
-                                                                    matB[0],
+                                                                    order ? matB[0] : matA[0],
+                                                                    order ? matA[0] : matB[0],
                                                                     &h_beta[0],
                                                                     matC[0],
                                                                     matD[0],
@@ -2615,10 +2690,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                     for(int32_t b = 0; b < block_count; b++)
                         CHECK_HIPBLASLT_ERROR(groupedGemmVec[b].setProblem(matmul[b],
                                                                            h_alpha_void,
-                                                                           da[b],
-                                                                           matA,
-                                                                           db[b],
-                                                                           matB,
+                                                                           order? db[b] : da[b],
+                                                                           order? matB : matA,
+                                                                           order? da[b] : db[b],
+                                                                           order? matA : matB,
                                                                            h_beta_void,
                                                                            dc[b],
                                                                            matC,
@@ -2662,8 +2737,8 @@ void testing_matmul_with_bias(const Arguments& arg,
         std::vector<hipblasLtMatmulHeuristicResult_t> tmpAlgo;
         EXPECT_HIPBLAS_STATUS(hipblaslt_ext::getAllAlgos(handle,
                                                          gemmType,
-                                                         transA,
-                                                         transB,
+                                                         _transA,
+                                                         _transB,
                                                          arg.a_type,
                                                          arg.b_type,
                                                          arg.c_type,
@@ -2682,16 +2757,16 @@ void testing_matmul_with_bias(const Arguments& arg,
                 if(arg.use_ext_setproblem)
                 {
                     for(int32_t b = 0; b < block_count; b++)
-                        CHECK_HIPBLASLT_ERROR(gemmVec[b].setProblem(M[0],
-                                                                    N[0],
+                        CHECK_HIPBLASLT_ERROR(gemmVec[b].setProblem(order ? N[0] : M[0],
+                                                                    order ? M[0] : N[0],
                                                                     K[0],
                                                                     num_batches[0],
-                                                                    lda[0],
-                                                                    ldb[0],
+                                                                    order ? B_col[0] : lda[0],
+                                                                    order ? A_col[0] : ldb[0],
                                                                     ldc[0],
                                                                     ldd[0],
-                                                                    stride_a[0],
-                                                                    stride_b[0],
+                                                                    order ? stride_b[0] : stride_a[0],
+                                                                    order ? stride_a[0] :stride_b[0],
                                                                     stride_c[0],
                                                                     stride_d[0],
                                                                     extepilogue[0],
@@ -2701,18 +2776,22 @@ void testing_matmul_with_bias(const Arguments& arg,
                 else
                 {
                     for(int32_t b = 0; b < block_count; b++)
+                    {
+                        auto _da =  (dA[0].as<char>()) + b * size_dA[0] * realDataTypeSize(TiA);
+                        auto _db =  (dB[0].as<char>()) + b * size_B[0] * realDataTypeSize(TiB);                    
                         CHECK_HIPBLASLT_ERROR(gemmVec[b].setProblem(
                             matmul[b][0],
                             alpha_in[0],
-                            (dA[0].as<char>()) + b * size_dA[0] * realDataTypeSize(TiA),
-                            matA[0],
-                            (dB[0].as<char>()) + b * size_B[0] * realDataTypeSize(TiB),
-                            matB[0],
+                            order ? _db : _da,
+                            order ? matB[0] : matA[0],
+                            order ? _da : _db,
+                            order ? matA[1] : matB[0],
                             &h_beta[0],
                             (dC[0].as<char>()) + b * size_C[0] * realDataTypeSize(To),
                             matC[0],
                             ((*dDp)[0].as<char>()) + b * size_D[0] * realDataTypeSize(To),
                             matD[0]));
+                    }
                 }
                 for(int j = 0; j < returnedAlgoCount; j++)
                 {
@@ -2748,8 +2827,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                         if(hipblaslt_ext::matmulIsAlgoSupported(handle,
                                                                 matmul[0][0],
                                                                 alpha_in[0],
-                                                                matA[0],
-                                                                matB[0],
+                                                                order ? matB[0] : matA[0],
+                                                                order ? matA[0] : matB[0],
                                                                 &h_beta[0],
                                                                 matC[0],
                                                                 matD[0],
@@ -2851,16 +2930,16 @@ void testing_matmul_with_bias(const Arguments& arg,
                 if(arg.use_ext_setproblem)
                 {
                     for(int32_t b = 0; b < block_count; b++)
-                        CHECK_HIPBLASLT_ERROR(gemmVec[b].setProblem(M[0],
-                                                                    N[0],
+                        CHECK_HIPBLASLT_ERROR(gemmVec[b].setProblem(order? N[0] : M[0],
+                                                                    order? M[0] : N[0],
                                                                     K[0],
                                                                     num_batches[0],
-                                                                    lda[0],
-                                                                    ldb[0],
+                                                                    order? ldb[0] : lda[0],
+                                                                    order? lda[0] : ldb[0],
                                                                     ldc[0],
                                                                     ldd[0],
-                                                                    stride_a[0],
-                                                                    stride_b[0],
+                                                                    order? stride_b[0] : stride_a[0],
+                                                                    order? stride_a[0] : stride_b[0],
                                                                     stride_c[0],
                                                                     stride_d[0],
                                                                     extepilogue[0],
@@ -2870,18 +2949,22 @@ void testing_matmul_with_bias(const Arguments& arg,
                 else
                 {
                     for(int32_t b = 0; b < block_count; b++)
+                    {
+                        auto _da =  (dA[0].as<char>()) + b * size_dA[0] * realDataTypeSize(TiA);
+                        auto _db =  (dB[0].as<char>()) + b * size_B[0] * realDataTypeSize(TiB);
                         CHECK_HIPBLASLT_ERROR(gemmVec[b].setProblem(
                             matmul[b][0],
                             alpha_in[0],
-                            (dA[0].as<char>()) + b * size_dA[0] * realDataTypeSize(TiA),
-                            matA[0],
-                            (dB[0].as<char>()) + b * size_B[0] * realDataTypeSize(TiB),
-                            matB[0],
+                            order ? _db : _da,
+                            order ? matB[0] : matA[0],
+                            order ? _da : _db,
+                            order ? matA[0] : matB[0],
                             &h_beta[0],
                             (dC[0].as<char>()) + b * size_C[0] * realDataTypeSize(To),
                             matC[0],
                             ((*dDp)[0].as<char>()) + b * size_D[0] * realDataTypeSize(To),
                             matD[0]));
+                    }
                 }
                 CHECK_HIPBLASLT_ERROR(
                     gemmVec[0].algoGetHeuristic(requestAlgoCount, gemmPref, tmpAlgo));
@@ -2909,8 +2992,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                 std::vector<hipblasLtMatmulHeuristicResult_t> tmpAlgo(requestAlgoCount);
                 EXPECT_HIPBLAS_STATUS((hipblasLtMatmulAlgoGetHeuristic(handle,
                                                                        matmul[0][0],
-                                                                       matA[0],
-                                                                       matB[0],
+                                                                       order ? matB[0] : matA[0],
+                                                                       order ? matA[0] : matB[0],
                                                                        matC[0],
                                                                        matD[0],
                                                                        pref,
@@ -2935,16 +3018,16 @@ void testing_matmul_with_bias(const Arguments& arg,
             {
                 auto num_batches_64 = std::vector<int64_t>{num_batches.begin(), num_batches.end()};
                 for(int32_t b = 0; b < block_count; b++)
-                    CHECK_HIPBLASLT_ERROR(groupedGemmVec[b].setProblem(M,
-                                                                       N,
+                    CHECK_HIPBLASLT_ERROR(groupedGemmVec[b].setProblem(order ? N : M,
+                                                                       order ? M : N,
                                                                        K,
                                                                        num_batches_64,
-                                                                       lda,
-                                                                       ldb,
+                                                                       order ? ldb : lda,
+                                                                       order ? lda : ldb,
                                                                        ldc,
                                                                        ldd,
-                                                                       stride_a,
-                                                                       stride_b,
+                                                                       order ? stride_b : stride_a,
+                                                                       order ? stride_a : stride_b,
                                                                        stride_c,
                                                                        stride_d,
                                                                        extepilogue,
@@ -3102,6 +3185,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                     // Note: for MX types, pass the reference float instead so there is
                     //       no need to convert them to float in cblas_gemm
                     cblas_gemm(
+                        order? CblasRowMajor : CblasColMajor,
                         transA,
                         transB,
                         M[gemmIdx],
@@ -3113,17 +3197,17 @@ void testing_matmul_with_bias(const Arguments& arg,
                                   + stride_a[gemmIdx] * batchIdx * realDataTypeSize(HIP_R_32F)
                             : hA[gemmIdx].as<char>()
                                   + stride_a[gemmIdx] * batchIdx * realDataTypeSize(TiA),
-                        lda[gemmIdx],
+                        order ? A_col[gemmIdx] : lda[gemmIdx],
                         isScaleBMXFormat
                             ? reinterpret_cast<char*>(refB[gemmIdx].data())
                                   + stride_b[gemmIdx] * batchIdx * realDataTypeSize(HIP_R_32F)
                             : hB[gemmIdx].as<char>()
                                   + stride_b[gemmIdx] * batchIdx * realDataTypeSize(TiB),
-                        ldb[gemmIdx],
+                        order ? B_col[gemmIdx] : ldb[gemmIdx],
                         betaTemp,
                         hD_gold_epl[gemmIdx].as<char>()
                             + stride_d[gemmIdx] * batchIdx * realDataTypeSize(Talpha),
-                        ldd[gemmIdx],
+                        order ? N[gemmIdx] : ldd[gemmIdx],
                         arg.scaleAlpha_vector ? hScaleAlphaVec[gemmIdx].as<char>() + 0 : nullptr,
                         scaleAVec,
                         scaleBVec,
@@ -3283,6 +3367,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                     // Note: for MX types, pass the reference float instead so there is
                     //       no need to convert them to float in cblas_gemm
                     cblas_gemm(
+                        order? CblasRowMajor : CblasColMajor,
                         transA,
                         transB,
                         M[gemmIdx],
@@ -3294,17 +3379,17 @@ void testing_matmul_with_bias(const Arguments& arg,
                                   + stride_a[gemmIdx] * batchIdx * realDataTypeSize(HIP_R_32F)
                             : hA[gemmIdx].as<char>()
                                   + stride_a[gemmIdx] * batchIdx * realDataTypeSize(TiA),
-                        lda[gemmIdx],
+                        order ? A_col[gemmIdx] : lda[gemmIdx],
                         isScaleBMXFormat
                             ? reinterpret_cast<char*>(refB[gemmIdx].data())
                                   + stride_a[gemmIdx] * batchIdx * realDataTypeSize(HIP_R_32F)
                             : hB[gemmIdx].as<char>()
                                   + stride_b[gemmIdx] * batchIdx * realDataTypeSize(TiB),
-                        ldb[gemmIdx],
+                        order ? B_col[gemmIdx] : ldb[gemmIdx],
                         betaTemp,
                         hD_gold[gemmIdx].as<char>()
                             + stride_d[gemmIdx] * batchIdx * realDataTypeSize(To),
-                        ldd[gemmIdx],
+                        order ? N[gemmIdx] : ldd[gemmIdx],
                         nullptr,
                         scaleAVec,
                         scaleBVec,
@@ -3357,10 +3442,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                     EXPECT_HIPBLAS_STATUS(hipblasLtMatmul(handle,
                                                           matmul[0][0],
                                                           alpha_in[0],
-                                                          dA[0].buf(),
-                                                          matA[0],
-                                                          dB[0].buf(),
-                                                          matB[0],
+                                                          order ? dB[0].buf() : dA[0].buf(),
+                                                          order ? matB[0] : matA[0],
+                                                          order ? dA[0].buf() : dB[0].buf(),
+                                                          order ? matA[0] : matB[0],
                                                           &(h_beta[0]),
                                                           dC[0].buf(),
                                                           matC[0],
@@ -3450,7 +3535,17 @@ void testing_matmul_with_bias(const Arguments& arg,
                       To,
                       Tbias,
                       Taux,
-                      Talpha);
+                      Talpha,
+                      hA,
+                      hB,
+                      A_row,
+                      A_col,
+                      B_row,
+                      B_col,
+                      lda,
+                      ldb,
+                      stride_a,
+                      stride_b);
             }
         }
     }
@@ -3578,17 +3673,19 @@ void testing_matmul_with_bias(const Arguments& arg,
                                                    + (i % block_count) * size_scaleAlphaVec[0]
                                               : alpha_in[0];
 
+                        auto _da = dA[0].as<char>()
+                                    + (i % block_count) * size_dA[0] * realDataTypeSize(TiA);
+                        auto _db = dB[0].as<char>()
+                                    + (i % block_count) * size_B[0] * realDataTypeSize(TiB);
                         EXPECT_HIPBLAS_STATUS(
                             hipblasLtMatmul(
                                 handle,
                                 ptr_matmul,
                                 ptr_alpha,
-                                dA[0].as<char>()
-                                    + (i % block_count) * size_dA[0] * realDataTypeSize(TiA),
-                                matA[0],
-                                dB[0].as<char>()
-                                    + (i % block_count) * size_B[0] * realDataTypeSize(TiB),
-                                matB[0],
+                                order? _db : _da,
+                                order? matB[0] : matA[0],
+                                order? _da : _db,
+                                order? matA[0] : matB[0],
                                 &(h_beta[0]),
                                 dC[0].as<char>()
                                     + (i % block_count) * size_C[0] * realDataTypeSize(To),
@@ -3634,17 +3731,19 @@ void testing_matmul_with_bias(const Arguments& arg,
                                               ? (dScaleAlphaVec[0].as<char>())
                                                    + (i % block_count) * size_scaleAlphaVec[0]
                                               : alpha_in[0];
+                        auto _da =  dA[0].as<char>()
+                                    + (i % block_count) * size_dA[0] * realDataTypeSize(TiA);
+                        auto _db =  dB[0].as<char>()
+                                    + (i % block_count) * size_B[0] * realDataTypeSize(TiB);
                         EXPECT_HIPBLAS_STATUS(
                             hipblasLtMatmul(
                                 handle,
                                 ptr_matmul,
                                 ptr_alpha,
-                                dA[0].as<char>()
-                                    + (i % block_count) * size_dA[0] * realDataTypeSize(TiA),
-                                matA[0],
-                                dB[0].as<char>()
-                                    + (i % block_count) * size_B[0] * realDataTypeSize(TiB),
-                                matB[0],
+                                order ? _db : _da,
+                                order? matB[0] : matA[0],
+                                order ? _db : _db,
+                                order? matA[0] : matB[0],
                                 &(h_beta[0]),
                                 dC[0].as<char>()
                                     + (i % block_count) * size_C[0] * realDataTypeSize(To),
@@ -3853,7 +3952,17 @@ void testing_matmul_with_bias(const Arguments& arg,
                       To,
                       Tbias,
                       Taux,
-                      Talpha);
+                      Talpha,
+                      hA,
+                      hB,
+                      A_row,
+                      A_col,
+                      B_row,
+                      B_col,
+                      lda,
+                      ldb,
+                      stride_a,
+                      stride_b);
             }
 
 #define argument_param                                                                            \
