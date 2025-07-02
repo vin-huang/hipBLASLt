@@ -308,6 +308,8 @@ try
     std::vector<int64_t>  lda, ldb, ldc, ldd, lde;
     std::vector<int64_t>  stride_a, stride_b, stride_c, stride_d, stride_e;
     std::vector<uint32_t> gsu_vector, wgm_vector;
+    bool order = 0;
+
     arg.init(); // set all defaults
     const char* tuningEnv          = getenv("HIPBLASLT_TUNING_FILE");
     const char* tuningMaxWorkSpace = getenv("HIPBLASLT_TUNING_USER_MAX_WORKSPACE");
@@ -622,6 +624,14 @@ try
         ("flush",
         value<bool>(&arg.flush)->default_value(tuningEnv ? true : false),
         "Flush icache, only works for gemm.")
+
+        ("order",
+        value<bool>(&arg.order)->default_value(false),
+        "memory order.")
+
+        ("print_tensor",
+        value<bool>(&arg.print_tensor)->default_value(false),
+        "print tensor.")
 
         ("help,h", "produces this help message")
 

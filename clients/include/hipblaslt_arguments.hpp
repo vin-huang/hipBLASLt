@@ -181,6 +181,10 @@ struct Arguments
     bool flush;
     int tensile_solution_selection_method;
 
+    bool order;
+    bool print_tensor;
+
+
     /*************************************************************************
      *                     End Of Arguments                                  *
      *************************************************************************/
@@ -279,8 +283,9 @@ struct Arguments
     OPER(print_solution_found) SEP   \
     OPER(print_kernel_info) SEP      \
     OPER(flush) SEP                  \
-    OPER(tensile_solution_selection_method) SEP
-
+    OPER(tensile_solution_selection_method) SEP \
+    OPER(order) SEP                  \
+    OPER(print_tensor) SEP
     // clang-format on
 
     // Validate input format.
