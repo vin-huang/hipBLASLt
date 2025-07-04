@@ -841,8 +841,7 @@ void check(hipStream_t                   stream,
            const std::vector<int64_t>&   lda,
            const std::vector<int64_t>&   ldb,
            const std::vector<int64_t>&   stride_a,
-           const std::vector<int64_t>&   stride_b,
-           bool                          order)
+           const std::vector<int64_t>&   stride_b)
 {
     // fetch GPU
     CHECK_HIP_ERROR(hipStreamSynchronize(stream));
@@ -1062,11 +1061,11 @@ void check(hipStream_t                   stream,
                 auto _b_n2 = _ldb;
                 auto _d_n1 = static_cast<decltype(_ldd)>(1);
                 auto _d_n2 = _ldd;
-                if(order)
+                if(arg.order)
                 {
-                    std::swap(_M, _N);
-                    std::swap(_A_row, _A_col);
-                    std::swap(_B_row, _B_col);
+                    _a_n2 = _A_col;
+                    _b_n2 = _B_col;
+                    _d_n2 = _N;
                     std::swap(_a_n1, _a_n2);
                     std::swap(_b_n1, _b_n2);
                     std::swap(_d_n1, _d_n2);
@@ -1520,21 +1519,18 @@ void testing_matmul_with_bias(const Arguments& arg,
         if(order)
         {
             hipblaslt_cout << "ROW MAJOR" << std::endl;
-            lda[i] = A_col[i];
-            ldb[i] = B_col[i];
-            ldc[i] = N[i];
-            ldd[i] = N[i];
-            lde[i] = N[i];
-            std::swap(A_row[i], A_col[i]);
-            std::swap(B_row[i], B_col[i]);
+            auto _lda = A_col[i];
+            auto _ldb = B_col[i];
+            auto _ldc = N[i];
+            auto _ldd = N[i];
             CHECK_HIPBLASLT_ERROR(
-                hipblasLtMatrixLayoutCreate(&(matA[i]), arg.a_type, A_row[i], A_col[i], lda[i]));
+                hipblasLtMatrixLayoutCreate(&(matA[i]), arg.a_type, A_col[i], A_row[i], _lda));
             CHECK_HIPBLASLT_ERROR(
-                hipblasLtMatrixLayoutCreate(&(matB[i]), arg.b_type, B_row[i], B_col[i], ldb[i]));
+                hipblasLtMatrixLayoutCreate(&(matB[i]), arg.b_type, B_col[i], B_row[i], _ldb));
             CHECK_HIPBLASLT_ERROR(
-                hipblasLtMatrixLayoutCreate(&(matC[i]), arg.c_type, N[i], M[i], N[i]));
+                hipblasLtMatrixLayoutCreate(&(matC[i]), arg.c_type, N[i], M[i], _ldc));
             CHECK_HIPBLASLT_ERROR(
-                hipblasLtMatrixLayoutCreate(&(matD[i]), arg.d_type, N[i], M[i], N[i]));
+                hipblasLtMatrixLayoutCreate(&(matD[i]), arg.d_type, N[i], M[i], _ldd));
             std::swap(_transA, _transB);
             //_transA = transA == HIPBLAS_OP_N ? HIPBLAS_OP_T : HIPBLAS_OP_N;
             //_transB = transB == HIPBLAS_OP_N ? HIPBLAS_OP_T : HIPBLAS_OP_N;
@@ -2580,8 +2576,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                                                                         order ? M[0] : N[0],
                                                                         K[0],
                                                                         num_batches[0],
-                                                                        order ? ldb[0] : lda[0],
-                                                                        order ? lda[0] : ldb[0],
+                                                                        order ? B_col[0] : lda[0],
+                                                                        order ? A_col[0] : ldb[0],
                                                                         ldc[0],
                                                                         ldd[0],
                                                                         order ? stride_b[0] : stride_a[0],
@@ -2765,8 +2761,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                                                                     order ? M[0] : N[0],
                                                                     K[0],
                                                                     num_batches[0],
-                                                                    order ? ldb[0] : lda[0],
-                                                                    order ? lda[0] : ldb[0],
+                                                                    order ? B_col[0] : lda[0],
+                                                                    order ? A_col[0] : ldb[0],
                                                                     ldc[0],
                                                                     ldd[0],
                                                                     order ? stride_b[0] : stride_a[0],
@@ -3201,17 +3197,17 @@ void testing_matmul_with_bias(const Arguments& arg,
                                   + stride_a[gemmIdx] * batchIdx * realDataTypeSize(HIP_R_32F)
                             : hA[gemmIdx].as<char>()
                                   + stride_a[gemmIdx] * batchIdx * realDataTypeSize(TiA),
-                        lda[gemmIdx],
+                        order ? A_col[gemmIdx] : lda[gemmIdx],
                         isScaleBMXFormat
                             ? reinterpret_cast<char*>(refB[gemmIdx].data())
                                   + stride_b[gemmIdx] * batchIdx * realDataTypeSize(HIP_R_32F)
                             : hB[gemmIdx].as<char>()
                                   + stride_b[gemmIdx] * batchIdx * realDataTypeSize(TiB),
-                        ldb[gemmIdx],
+                        order ? B_col[gemmIdx] : ldb[gemmIdx],
                         betaTemp,
                         hD_gold_epl[gemmIdx].as<char>()
                             + stride_d[gemmIdx] * batchIdx * realDataTypeSize(Talpha),
-                        ldd[gemmIdx],
+                        order ? N[gemmIdx] : ldd[gemmIdx],
                         arg.scaleAlpha_vector ? hScaleAlphaVec[gemmIdx].as<char>() + 0 : nullptr,
                         scaleAVec,
                         scaleBVec,
@@ -3383,17 +3379,17 @@ void testing_matmul_with_bias(const Arguments& arg,
                                   + stride_a[gemmIdx] * batchIdx * realDataTypeSize(HIP_R_32F)
                             : hA[gemmIdx].as<char>()
                                   + stride_a[gemmIdx] * batchIdx * realDataTypeSize(TiA),
-                        lda[gemmIdx],
+                        order ? A_col[gemmIdx] : lda[gemmIdx],
                         isScaleBMXFormat
                             ? reinterpret_cast<char*>(refB[gemmIdx].data())
                                   + stride_a[gemmIdx] * batchIdx * realDataTypeSize(HIP_R_32F)
                             : hB[gemmIdx].as<char>()
                                   + stride_b[gemmIdx] * batchIdx * realDataTypeSize(TiB),
-                        ldb[gemmIdx],
+                        order ? B_col[gemmIdx] : ldb[gemmIdx],
                         betaTemp,
                         hD_gold[gemmIdx].as<char>()
                             + stride_d[gemmIdx] * batchIdx * realDataTypeSize(To),
-                        ldd[gemmIdx],
+                        order ? N[gemmIdx] : ldd[gemmIdx],
                         nullptr,
                         scaleAVec,
                         scaleBVec,
@@ -3512,8 +3508,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                 check(stream,
                       arg,
                       gemm_count,
-                      order ? N : M,
-                      order ? M : N,
+                      M,
+                      N,
                       ldd,
                       lde,
                       stride_d,
@@ -3549,8 +3545,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                       lda,
                       ldb,
                       stride_a,
-                      stride_b,
-                      order);
+                      stride_b);
             }
         }
     }
@@ -3930,8 +3925,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                 check(stream,
                       arg,
                       gemm_count,
-                      order ? N : M,
-                      order ? M : N,
+                      M,
+                      N,
                       ldd,
                       lde,
                       stride_d,
@@ -3967,8 +3962,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                       lda,
                       ldb,
                       stride_a,
-                      stride_b,
-                      order);
+                      stride_b);
             }
 
 #define argument_param                                                                            \
